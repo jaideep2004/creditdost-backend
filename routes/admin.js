@@ -1,0 +1,105 @@
+const express = require('express');
+const {
+  getDashboardStats,
+  getRecentActivities,
+  getAllUsers,
+  getUserById,
+  updateUser,
+  getAllLeads,
+  getLeadById,
+  updateLead,
+  getAllTransactions,
+  getTransactionById,
+  getAllPayouts,
+  updatePayout,
+  getAllReferrals,
+  getAllCreditReportsAdmin,
+  getSettings,
+  updateSetting,
+} = require('../controllers/adminController');
+const auth = require('../middleware/auth');
+const rbac = require('../middleware/rbac');
+
+const router = express.Router();
+
+// @route   GET /api/admin/dashboard
+// @desc    Get admin dashboard statistics
+// @access  Private/Admin
+router.get('/dashboard', auth, rbac('admin'), getDashboardStats);
+
+// @route   GET /api/admin/dashboard/activities
+// @desc    Get recent activities for admin dashboard
+// @access  Private/Admin
+router.get('/dashboard/activities', auth, rbac('admin'), getRecentActivities);
+
+// @route   GET /api/admin/users
+// @desc    Get all users
+// @access  Private/Admin
+router.get('/users', auth, rbac('admin'), getAllUsers);
+
+// @route   GET /api/admin/users/:id
+// @desc    Get user by ID
+// @access  Private/Admin
+router.get('/users/:id', auth, rbac('admin'), getUserById);
+
+// @route   PUT /api/admin/users/:id
+// @desc    Update user
+// @access  Private/Admin
+router.put('/users/:id', auth, rbac('admin'), updateUser);
+
+// @route   GET /api/admin/leads
+// @desc    Get all leads
+// @access  Private/Admin
+router.get('/leads', auth, rbac('admin'), getAllLeads);
+
+// @route   GET /api/admin/leads/:id
+// @desc    Get lead by ID
+// @access  Private/Admin
+router.get('/leads/:id', auth, rbac('admin'), getLeadById);
+
+// @route   PUT /api/admin/leads/:id
+// @desc    Update lead
+// @access  Private/Admin
+router.put('/leads/:id', auth, rbac('admin'), updateLead);
+
+// @route   GET /api/admin/transactions
+// @desc    Get all transactions
+// @access  Private/Admin
+router.get('/transactions', auth, rbac('admin'), getAllTransactions);
+
+// @route   GET /api/admin/transactions/:id
+// @desc    Get transaction by ID
+// @access  Private/Admin
+router.get('/transactions/:id', auth, rbac('admin'), getTransactionById);
+
+// @route   GET /api/admin/payouts
+// @desc    Get all payouts
+// @access  Private/Admin
+router.get('/payouts', auth, rbac('admin'), getAllPayouts);
+
+// @route   PUT /api/admin/payouts/:id
+// @desc    Update payout
+// @access  Private/Admin
+router.put('/payouts/:id', auth, rbac('admin'), updatePayout);
+
+// @route   GET /api/admin/referrals
+// @desc    Get all referrals
+// @access  Private/Admin
+router.get('/referrals', auth, rbac('admin'), getAllReferrals);
+
+// @route   GET /api/admin/credit-reports
+// @desc    Get all credit reports
+// @access  Private/Admin
+router.get('/credit-reports', auth, rbac('admin'), getAllCreditReportsAdmin);
+
+// @route   GET /api/admin/settings
+// @desc    Get all settings
+// @access  Private/Admin
+router.get('/settings', auth, rbac('admin'), getSettings);
+
+// @route   PUT /api/admin/settings
+// @desc    Update setting
+// @access  Private/Admin
+router.put('/settings', auth, rbac('admin'), updateSetting);
+
+module.exports = router;

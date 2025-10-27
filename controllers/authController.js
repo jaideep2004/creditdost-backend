@@ -1,0 +1,253 @@
+const User = require('../models/User');
+const Franchise = require('../models/Franchise');
+const { generateToken } = require('../config/jwt');
+const Joi = require('joi');
+const { sendRegistrationEmail, sendAdminNotificationEmail, sendAccountCredentialsEmail } = require('../utils/emailService');
+const bcrypt = require('bcryptjs');
+
+// Registration validation schema
+const registerSchema = Joi.object({
+  name: Joi.string().min(2).max(50).required(),
+  email: Joi.string().email().required(),
+  phone: Joi.string().pattern(/^[0-9]{10}$/).required(),
+  state: Joi.string().required(),
+  pincode: Joi.string().pattern(/^[0-9]{6}$/).required(),
+  language: Joi.string().required(),
+  password: Joi.string().min(6).required(), // We'll make this optional in validation logic
+});
+
+// Login validation schema
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required(),
+});
+
+// Register a new franchise user
+const register = async (req, res) => {
+  try {
+    // Validate request body
+    const { error } = registerSchema.validate(req.body);
+    if (error) {
+      // Allow missing password for now (will be set later)
+      const details = error.details[0];
+      if (details.path[0] !== 'password') {
+        return res.status(400).json({
+          message: 'Validation error',
+          details: details.message
+        });
+      }
+    }
+    
+    const { name, email, phone, state, pincode, language, password } = req.body;
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+    
+    // Create user with a temporary password if not provided
+    const user = new User({
+      name,
+      email,
+      phone,
+      state,
+      pincode,
+      language,
+      password: password || 'temp_password', // Use provided password or temp password
+      role: 'franchise_user'
+    });
+    
+    await user.save();
+    
+    // Create franchise record
+    const franchise = new Franchise({
+      userId: user._id,
+      businessName: name, // Use user's name as business name initially
+      ownerName: name,
+      email,
+      phone,
+    });
+    
+    await franchise.save();
+    
+    // Send registration email to user
+    try {
+      await sendRegistrationEmail(user);
+    } catch (emailError) {
+      console.error('Failed to send registration email to user:', emailError);
+      // Don't fail the registration if email sending fails
+    }
+    
+    // Send notification email to admin
+    try {
+      await sendAdminNotificationEmail(user);
+    } catch (emailError) {
+      console.error('Failed to send registration notification to admin:', emailError);
+      // Don't fail the registration if email sending fails
+    }
+    
+    // Generate token
+    const token = generateToken({ id: user._id, role: user.role });
+    
+    // Set cookie
+    const cookieOptions = {
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    };
+    
+    res.status(201)
+      .cookie('token', token, cookieOptions)
+      .json({
+        message: 'User registered successfully. Please complete your package payment and await admin approval to set your password.',
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        }
+      });
+  } catch (error) {
+    console.error('Registration error:', error); // Log the actual error
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Login user
+const login = async (req, res) => {
+  try {
+    console.log('Login request body:', req.body); // Debug log
+    
+    // Validate request body
+    const { error } = loginSchema.validate(req.body);
+    if (error) {
+      console.log('Validation error:', error.details); // Debug log
+      return res.status(400).json({
+        message: 'Validation error',
+        details: error.details[0].message
+      });
+    }
+    
+    const { email, password } = req.body;
+    console.log('Login attempt for email:', email); // Debug log
+    
+    // Check if user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      console.log('User not found for email:', email); // Debug log
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+    
+    console.log('User found:', user.email);
+    console.log('Stored password hash:', user.password);
+    
+    // Check if password is correct
+    const isMatch = await user.comparePassword(password);
+    console.log('Password match result:', isMatch);
+    
+    if (!isMatch) {
+      console.log('Invalid password for user:', email); // Debug log
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+    
+    // Check if user is active
+    if (!user.isActive) {
+      console.log('User account deactivated:', email); // Debug log
+      return res.status(400).json({ message: 'Account is deactivated' });
+    }
+    
+    // Generate token
+    const token = generateToken({ id: user._id, role: user.role });
+    
+    // Set cookie
+    const cookieOptions = {
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    };
+    
+    res
+      .cookie('token', token, cookieOptions)
+      .json({
+        message: 'Login successful',
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        }
+      });
+  } catch (error) {
+    console.error('Login error:', error); // Debug log
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get user profile
+const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json({ user });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Logout user
+const logout = async (req, res) => {
+  res
+    .cookie('token', 'none', {
+      expires: new Date(Date.now() + 10 * 1000), // 10 seconds
+      httpOnly: true,
+    })
+    .json({ message: 'User logged out successfully' });
+};
+
+// Forgot password
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Check if user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Generate a temporary password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    
+    // Update user with the new password (will be hashed by pre-save hook)
+    user.password = tempPassword;
+    await user.save();
+    
+    // Send password reset email
+    try {
+      await sendAccountCredentialsEmail(user, tempPassword);
+      res.json({ message: 'Password reset successful. Please check your email for the new password.' });
+    } catch (emailError) {
+      console.error('Failed to send password reset email:', emailError);
+      res.status(500).json({ message: 'Failed to send password reset email' });
+    }
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  logout,
+  getProfile,
+  forgotPassword,
+};
