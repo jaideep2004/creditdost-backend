@@ -9,6 +9,7 @@ const {
   getPackagesForPurchase,
   getFranchiseReferrals,
   createReferral,
+  getFranchisePayouts,
 } = require('../controllers/dashboardController');
 const auth = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
@@ -59,5 +60,10 @@ router.get('/referrals', auth, rbac('franchise_user'), getFranchiseReferrals);
 // @desc    Create referral
 // @access  Private/Franchise User
 router.post('/referrals', auth, rbac('franchise_user'), createReferral);
+
+// @route   GET /api/dashboard/payouts
+// @desc    Get franchise payouts
+// @access  Private/Franchise User
+router.get('/payouts', auth, rbac('franchise_user'), getFranchisePayouts);
 
 module.exports = router;

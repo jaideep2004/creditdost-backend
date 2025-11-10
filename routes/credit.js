@@ -4,6 +4,7 @@ const {
   getCreditReports,
   getAllCreditReports,
   getCreditReportById,
+  getSurepassApiKey,
   updateSurepassApiKey,
 } = require('../controllers/creditController');
 const auth = require('../middleware/auth');
@@ -30,6 +31,11 @@ router.get('/reports/all', auth, rbac('admin'), getAllCreditReports);
 // @desc    Get credit report by ID
 // @access  Private
 router.get('/reports/:id', auth, getCreditReportById);
+
+// @route   GET /api/credit/settings/api-key
+// @desc    Get Surepass API key
+// @access  Private/Admin
+router.get('/settings/api-key', auth, rbac('admin'), getSurepassApiKey);
 
 // @route   PUT /api/credit/settings/api-key
 // @desc    Update Surepass API key

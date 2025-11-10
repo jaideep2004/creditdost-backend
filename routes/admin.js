@@ -5,6 +5,7 @@ const {
   getAllUsers,
   getUserById,
   updateUser,
+  createLead,
   getAllLeads,
   getLeadById,
   updateLead,
@@ -13,9 +14,16 @@ const {
   getAllPayouts,
   updatePayout,
   getAllReferrals,
+  getReferralSettings,
+  updateReferralSettings,
   getAllCreditReportsAdmin,
   getSettings,
   updateSetting,
+  getAllFranchisesWithCredits,
+  rechargeFranchiseCredits,
+  getCreditRechargeHistory,
+  calculateFranchisePayouts,
+  getFranchisePayouts,
 } = require('../controllers/adminController');
 const auth = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
@@ -46,6 +54,11 @@ router.get('/users/:id', auth, rbac('admin'), getUserById);
 // @desc    Update user
 // @access  Private/Admin
 router.put('/users/:id', auth, rbac('admin'), updateUser);
+
+// @route   POST /api/admin/leads
+// @desc    Create new lead
+// @access  Private/Admin
+router.post('/leads', auth, rbac('admin'), createLead);
 
 // @route   GET /api/admin/leads
 // @desc    Get all leads
@@ -82,15 +95,50 @@ router.get('/payouts', auth, rbac('admin'), getAllPayouts);
 // @access  Private/Admin
 router.put('/payouts/:id', auth, rbac('admin'), updatePayout);
 
+// @route   POST /api/admin/payouts/calculate
+// @desc    Calculate payout for a franchise
+// @access  Private/Admin
+router.post('/payouts/calculate', auth, rbac('admin'), calculateFranchisePayouts);
+
+// @route   GET /api/admin/payouts/franchise/:franchiseId
+// @desc    Get payouts for a specific franchise
+// @access  Private/Admin
+router.get('/payouts/franchise/:franchiseId', auth, rbac('admin'), getFranchisePayouts);
+
 // @route   GET /api/admin/referrals
 // @desc    Get all referrals
 // @access  Private/Admin
 router.get('/referrals', auth, rbac('admin'), getAllReferrals);
 
+// @route   GET /api/admin/referral-settings
+// @desc    Get referral settings
+// @access  Private/Admin
+router.get('/referral-settings', auth, rbac('admin'), getReferralSettings);
+
+// @route   PUT /api/admin/referral-settings
+// @desc    Update referral settings
+// @access  Private/Admin
+router.put('/referral-settings', auth, rbac('admin'), updateReferralSettings);
+
 // @route   GET /api/admin/credit-reports
 // @desc    Get all credit reports
 // @access  Private/Admin
 router.get('/credit-reports', auth, rbac('admin'), getAllCreditReportsAdmin);
+
+// @route   GET /api/admin/franchises/credits
+// @desc    Get all franchises with credit information
+// @access  Private/Admin
+router.get('/franchises/credits', auth, rbac('admin'), getAllFranchisesWithCredits);
+
+// @route   POST /api/admin/franchises/recharge
+// @desc    Recharge credits for a franchise
+// @access  Private/Admin
+router.post('/franchises/recharge', auth, rbac('admin'), rechargeFranchiseCredits);
+
+// @route   GET /api/admin/credits/history
+// @desc    Get credit recharge history
+// @access  Private/Admin
+router.get('/credits/history', auth, rbac('admin'), getCreditRechargeHistory);
 
 // @route   GET /api/admin/settings
 // @desc    Get all settings

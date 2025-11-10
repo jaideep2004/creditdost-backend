@@ -1,18 +1,3 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const User = require('./models/User');
-const Package = require('./models/Package');
-const dotenv = require('dotenv');
-
-// Load environment variables
-dotenv.config();
-
-// Connect to database
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/franchise_management', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
-
 // Sample packages data
 const packages = [
   {
@@ -28,6 +13,10 @@ const packages = [
       'Access to leads management',
     ],
     sortOrder: 1,
+    // Business payout settings
+    businessPayoutPercentage: 15,
+    businessPayoutType: 'percentage',
+    businessPayoutFixedAmount: 0,
   },
   {
     name: 'Professional Package',
@@ -44,6 +33,10 @@ const packages = [
       'Business MIS reports',
     ],
     sortOrder: 2,
+    // Business payout settings
+    businessPayoutPercentage: 20,
+    businessPayoutType: 'percentage',
+    businessPayoutFixedAmount: 0,
   },
   {
     name: 'Enterprise Package',
@@ -61,6 +54,48 @@ const packages = [
       'AI-powered insights',
     ],
     sortOrder: 3,
+    // Business payout settings
+    businessPayoutPercentage: 25,
+    businessPayoutType: 'percentage',
+    businessPayoutFixedAmount: 0,
+  },
+];
+
+// Sample customer packages data
+const customerPackages = [
+  {
+    name: 'Basic Credit Check',
+    description: 'Single credit report for individual customers',
+    price: 199,
+    creditsIncluded: 1,
+    features: [
+      'One credit report',
+      'Basic credit score',
+      'PDF download',
+    ],
+    sortOrder: 1,
+    // Business payout settings
+    businessPayoutPercentage: 30,
+    businessPayoutType: 'percentage',
+    businessPayoutFixedAmount: 0,
+  },
+  {
+    name: 'Premium Credit Check',
+    description: 'Comprehensive credit analysis with detailed insights',
+    price: 499,
+    creditsIncluded: 1,
+    features: [
+      'Detailed credit report',
+      'Credit score analysis',
+      'Recommendations',
+      'PDF download',
+      'Email support',
+    ],
+    sortOrder: 2,
+    // Business payout settings
+    businessPayoutPercentage: 25,
+    businessPayoutType: 'percentage',
+    businessPayoutFixedAmount: 0,
   },
 ];
 
@@ -70,6 +105,7 @@ const seed = async () => {
     // Clear existing data
     await User.deleteMany({ role: 'admin' });
     await Package.deleteMany({});
+    await CustomerPackage.deleteMany({});
     
     console.log('Existing data cleared');
     
@@ -97,6 +133,14 @@ const seed = async () => {
     }
     
     console.log('Sample packages created');
+    
+    // Create sample customer packages
+    for (const pkg of customerPackages) {
+      const customerPackage = new CustomerPackage(pkg);
+      await customerPackage.save();
+    }
+    
+    console.log('Sample customer packages created');
     
     console.log('Seeding completed successfully');
     process.exit(0);

@@ -4,7 +4,7 @@ const leadSchema = new mongoose.Schema({
   franchiseId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Franchise',
-    required: true,
+    required: false, // Make this optional initially
   },
   name: {
     type: String,
@@ -35,7 +35,7 @@ const leadSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['new', 'contacted', 'qualified', 'lost', 'converted'],
+    enum: ['new', 'contacted', 'qualified', 'lost', 'converted', 'assigned'],
     default: 'new',
   },
   assignedTo: {

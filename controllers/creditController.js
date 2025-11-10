@@ -1,102 +1,343 @@
-const axios = require('axios');
-const CreditReport = require('../models/CreditReport');
-const Setting = require('../models/Setting');
-const Joi = require('joi');
+const axios = require("axios");
+const CreditReport = require("../models/CreditReport");
+const Setting = require("../models/Setting");
+const Franchise = require("../models/Franchise");
+const Joi = require("joi");
+const fs = require("fs");
+const path = require("path");
 
 // Validation schema for credit check
 const creditCheckSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
-  mobile: Joi.string().pattern(/^[0-9]{10}$/).required(),
+  mobile: Joi.string()
+    .pattern(/^[0-9]{10}$/)
+    .required(),
   personId: Joi.string().optional(),
+  bureau: Joi.string()
+    .valid("equifax", "experian", "cibil", "crif")
+    .default("cibil"),
+  pan: Joi.string().optional(),
+  aadhaar: Joi.string().optional(),
+  dob: Joi.date().optional(),
+  gender: Joi.string().optional(),
 });
 
-// Get Surepass API key from settings
-const getSurepassApiKey = async () => {
-  const setting = await Setting.findOne({ key: 'surepass_api_key' });
-  return setting ? setting.value : process.env.SUREPASS_API_KEY;
+// Helper function to get Surepass API key value directly
+const getSurepassApiKeyValue = async () => {
+  try {
+    const setting = await Setting.findOne({ key: "surepass_api_key" });
+    return setting ? setting.value : process.env.SUREPASS_API_KEY;
+  } catch (error) {
+    console.error("Error fetching Surepass API key:", error);
+    return null;
+  }
 };
 
-// Check credit score
+// Get Surepass API key (admin only)
+const getSurepassApiKey = async (req, res) => {
+  try {
+    const setting = await Setting.findOne({ key: "surepass_api_key" });
+
+    if (!setting) {
+      return res
+        .status(404)
+        .json({ message: "Surepass API key not configured" });
+    }
+
+    // Return only a masked version of the API key for security
+    const maskedKey =
+      setting.value.substring(0, 4) +
+      "..." +
+      setting.value.substring(setting.value.length - 4);
+
+    res.json({
+      message: "Surepass API key retrieved successfully",
+      apiKey: maskedKey,
+      hasApiKey: true,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Map bureau names to Surepass API endpoints and request data format
+const getBureauConfig = (bureau) => {
+  const configs = {
+    cibil: {
+      endpoint:
+        "https://kyc-api.surepass.io/api/v1/credit-report-cibil/fetch-report-pdf",
+      formatData: (data) => ({
+        mobile: data.mobile,
+        pan: data.pan,
+        name: data.name,
+        gender: data.gender ? data.gender.toLowerCase() : "male",
+        consent: "Y",
+      }),
+    },
+    crif: {
+      endpoint:
+        "https://kyc-api.surepass.app/api/v1/credit-report-crif/fetch-report-pdf",
+      formatData: (data) => {
+        // Split name into first and last name
+        const nameParts = data.name.split(" ");
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || " ";
+
+        return {
+          first_name: firstName,
+          last_name: lastName,
+          mobile: data.mobile,
+          pan: data.pan,
+          consent: "Y",
+          raw: false,
+        };
+      },
+    },
+    experian: {
+      endpoint:
+        "https://kyc-api.surepass.io/api/v1/credit-report-experian/fetch-report-pdf",
+      formatData: (data) => ({
+        name: data.name,
+        consent: "Y",
+        mobile: data.mobile,
+        pan: data.pan,
+      }),
+    },
+    equifax: {
+      endpoint: "https://kyc-api.surepass.io/api/v1/crs/fetch-pdf-report",
+      formatData: (data) => ({
+        name: data.name,
+        mobile: data.mobile,
+        person_id: data.personId,
+        pan: data.pan,
+        aadhaar: data.aadhaar,
+        dob: data.dob,
+        gender: data.gender,
+      }),
+    },
+  };
+  return configs[bureau] || configs.cibil;
+};
+
+// Check credit score for specific bureau
 const checkCreditScore = async (req, res) => {
   try {
     // Validate request body
     const { error } = creditCheckSchema.validate(req.body);
     if (error) {
       return res.status(400).json({
-        message: 'Validation error',
-        details: error.details[0].message
+        message: "Validation error",
+        details: error.details[0].message,
       });
     }
-    
-    const { name, mobile, personId } = req.body;
-    
-    // Get Surepass API key
-    const apiKey = await getSurepassApiKey();
-    if (!apiKey) {
-      return res.status(500).json({ message: 'Surepass API key not configured' });
+
+    const {
+      name,
+      mobile,
+      personId,
+      bureau = "cibil",
+      pan,
+      aadhaar,
+      dob,
+      gender,
+    } = req.body;
+
+    // Get franchise details to check credits
+    const franchise = await Franchise.findById(req.user.franchiseId);
+    if (!franchise) {
+      return res.status(404).json({ message: "Franchise not found" });
     }
-    
-    // Make request to Surepass API
-    const response = await axios.post(
-      'https://kyc-api.surepass.io/api/v1/crs/credit-score',
-      {
-        name,
-        mobile,
-        person_id: personId,
-      },
-      {
+
+    // Check if franchise has enough credits
+    if (franchise.credits < 1) {
+      return res
+        .status(400)
+        .json({ message: "Insufficient credits to generate credit report" });
+    }
+
+    // Get Surepass API key
+    const apiKey = await getSurepassApiKeyValue();
+    if (!apiKey) {
+      return res
+        .status(500)
+        .json({ message: "Surepass API key not configured" });
+    }
+
+    // Get the appropriate endpoint and data formatter for the bureau
+    const bureauConfig = getBureauConfig(bureau);
+
+    // Prepare request data based on bureau requirements
+    const requestData = bureauConfig.formatData({
+      name,
+      mobile,
+      personId,
+      pan,
+      aadhaar,
+      dob,
+      gender,
+    });
+
+    // Make request to Surepass API with timeout and better error handling
+    let response;
+    try {
+      response = await axios.post(bureauConfig.endpoint, requestData, {
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
         },
+        timeout: 30000, // 30 second timeout
+      });
+    } catch (apiError) {
+      console.error("Surepass API error:", apiError.message);
+
+      // Handle timeout specifically
+      if (apiError.code === "ETIMEDOUT" || apiError.code === "ECONNABORTED") {
+        return res.status(504).json({
+          message:
+            "Request timeout when connecting to credit bureau. Please try again later.",
+          error: "TIMEOUT_ERROR",
+        });
       }
-    );
-    
+
+      // Handle network errors
+      if (apiError.isAxiosError && !apiError.response) {
+        return res.status(502).json({
+          message:
+            "Network error when connecting to credit bureau. Please check your internet connection and try again.",
+          error: "NETWORK_ERROR",
+        });
+      }
+
+      // Forward the error from Surepass API if available
+      if (apiError.response) {
+        return res.status(apiError.response.status).json({
+          message: "Credit check failed",
+          error: apiError.response.data || apiError.message,
+        });
+      }
+
+      // Generic error
+      return res.status(500).json({
+        message: "An error occurred while checking credit score",
+        error: apiError.message,
+      });
+    }
+
+    // Extract score from response based on bureau
+    let score = null;
+    if (response.data.data && response.data.data.score) {
+      score = response.data.data.score;
+    } else if (response.data.data && response.data.data.credit_score) {
+      score = response.data.data.credit_score;
+    }
+
+    // Extract report URL from response
+    let reportUrl = null;
+    if (response.data.data) {
+      // Check for various possible report URL fields
+      reportUrl =
+        response.data.data.report_url ||
+        response.data.data.pdf_url ||
+        response.data.data.credit_report_link ||
+        response.data.data.report_link ||
+        null;
+    }
+
     // Save credit report
     const creditReport = new CreditReport({
       userId: req.user.id,
-      franchiseId: req.user.role === 'franchise_user' ? req.user.franchiseId : null,
+      franchiseId: req.user.franchiseId,
       name,
       mobile,
-      score: response.data.data.score,
+      pan,
+      aadhaar,
+      dob,
+      gender,
+      score,
+      bureau,
       reportData: response.data,
+      reportUrl: reportUrl,
     });
-    
+
     await creditReport.save();
-    
+
+    // Deduct credit from franchise
+    franchise.credits -= 1;
+    await franchise.save();
+
+    // If we have a report URL, download and save the PDF locally
+    if (reportUrl) {
+      try {
+        // Create reports directory if it doesn't exist
+        const reportsDir = path.join(__dirname, "../reports");
+        if (!fs.existsSync(reportsDir)) {
+          fs.mkdirSync(reportsDir, { recursive: true });
+        }
+
+        // Generate a unique filename
+        const timestamp = Date.now();
+        const filename = `credit_report_${creditReport._id}_${timestamp}.pdf`;
+        const localPath = path.join(reportsDir, filename);
+
+        // Download the PDF with timeout
+        const pdfResponse = await axios({
+          method: "GET",
+          url: reportUrl,
+          responseType: "stream",
+          timeout: 30000, // 30 second timeout
+        });
+
+        // Save the PDF to local storage
+        const writer = fs.createWriteStream(localPath);
+        pdfResponse.data.pipe(writer);
+
+        // Wait for the download to complete
+        await new Promise((resolve, reject) => {
+          writer.on("finish", resolve);
+          writer.on("error", reject);
+        });
+
+        // Update the credit report with the local path
+        creditReport.localPath = `/reports/${filename}`;
+        await creditReport.save();
+      } catch (downloadError) {
+        console.error("Error downloading PDF:", downloadError);
+        // We don't fail the entire request if PDF download fails
+      }
+    }
+
     res.json({
-      message: 'Credit score retrieved successfully',
+      message: `Credit report retrieved successfully from ${bureau.toUpperCase()}`,
       creditReport: {
         id: creditReport._id,
         name: creditReport.name,
         mobile: creditReport.mobile,
+        pan: creditReport.pan,
+        aadhaar: creditReport.aadhaar,
         score: creditReport.score,
+        bureau: creditReport.bureau,
+        reportUrl: creditReport.reportUrl,
+        localPath: creditReport.localPath,
         createdAt: creditReport.createdAt,
       },
+      remainingCredits: franchise.credits,
     });
   } catch (error) {
-    if (error.response) {
-      // Surepass API error
-      res.status(error.response.status).json({
-        message: 'Credit check failed',
-        error: error.response.data,
-      });
-    } else {
-      // Other error
-      res.status(500).json({ message: 'Server error', error: error.message });
-    }
+    console.error("Credit check error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
 // Get credit reports for franchise
 const getCreditReports = async (req, res) => {
   try {
-    const reports = await CreditReport.find({ franchiseId: req.user.franchiseId })
-      .sort({ createdAt: -1 });
-    
+    const reports = await CreditReport.find({
+      franchiseId: req.user.franchiseId,
+    }).sort({ createdAt: -1 });
+
     res.json(reports);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -104,13 +345,13 @@ const getCreditReports = async (req, res) => {
 const getAllCreditReports = async (req, res) => {
   try {
     const reports = await CreditReport.find()
-      .populate('userId', 'name email')
-      .populate('franchiseId', 'businessName')
+      .populate("userId", "name email")
+      .populate("franchiseId", "businessName")
       .sort({ createdAt: -1 });
-    
+
     res.json(reports);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -118,21 +359,24 @@ const getAllCreditReports = async (req, res) => {
 const getCreditReportById = async (req, res) => {
   try {
     const report = await CreditReport.findById(req.params.id)
-      .populate('userId', 'name email')
-      .populate('franchiseId', 'businessName');
-    
+      .populate("userId", "name email")
+      .populate("franchiseId", "businessName");
+
     if (!report) {
-      return res.status(404).json({ message: 'Credit report not found' });
+      return res.status(404).json({ message: "Credit report not found" });
     }
-    
+
     // Check permissions
-    if (req.user.role === 'franchise_user' && report.franchiseId.toString() !== req.user.franchiseId.toString()) {
-      return res.status(403).json({ message: 'Access denied' });
+    if (
+      req.user.role === "franchise_user" &&
+      report.franchiseId.toString() !== req.user.franchiseId.toString()
+    ) {
+      return res.status(403).json({ message: "Access denied" });
     }
-    
+
     res.json(report);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -140,27 +384,27 @@ const getCreditReportById = async (req, res) => {
 const updateSurepassApiKey = async (req, res) => {
   try {
     const { apiKey } = req.body;
-    
-    let setting = await Setting.findOne({ key: 'surepass_api_key' });
-    
+
+    let setting = await Setting.findOne({ key: "surepass_api_key" });
+
     if (setting) {
       setting.value = apiKey;
       await setting.save();
     } else {
       setting = new Setting({
-        key: 'surepass_api_key',
+        key: "surepass_api_key",
         value: apiKey,
-        description: 'Surepass API Key for credit checks',
+        description: "Surepass API Key for credit checks",
       });
       await setting.save();
     }
-    
+
     res.json({
-      message: 'Surepass API key updated successfully',
+      message: "Surepass API key updated successfully",
       setting,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -169,5 +413,7 @@ module.exports = {
   getCreditReports,
   getAllCreditReports,
   getCreditReportById,
+  getSurepassApiKey,
   updateSurepassApiKey,
+  getSurepassApiKeyValue, // Export the helper function
 };

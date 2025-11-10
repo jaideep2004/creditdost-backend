@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const packageSchema = new mongoose.Schema({
+const customerPackageSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
@@ -28,7 +28,7 @@ const packageSchema = new mongoose.Schema({
     default: true,
   },
   sortOrder: {
-    type: Number, 
+    type: Number,
     default: 0,
   },
   // Business payout settings
@@ -53,6 +53,6 @@ const packageSchema = new mongoose.Schema({
 });
 
 // Set default value for features array
-packageSchema.path('features').default(() => []);
+customerPackageSchema.path('features').default(() => []);
 
-module.exports = mongoose.model('Package', packageSchema);
+module.exports = mongoose.model('CustomerPackage', customerPackageSchema);

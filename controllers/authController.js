@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Franchise = require('../models/Franchise');
+const Referral = require('../models/Referral');
 const { generateToken } = require('../config/jwt');
 const Joi = require('joi');
 const { sendRegistrationEmail, sendAdminNotificationEmail, sendAccountCredentialsEmail } = require('../utils/emailService');
@@ -13,7 +14,8 @@ const registerSchema = Joi.object({
   state: Joi.string().required(),
   pincode: Joi.string().pattern(/^[0-9]{6}$/).required(),
   language: Joi.string().required(),
-  password: Joi.string().min(6).required(), // We'll make this optional in validation logic
+  password: Joi.string().min(6).required(),
+  referralId: Joi.string().hex().length(24).optional() // Validate as MongoDB ObjectId
 });
 
 // Login validation schema
@@ -28,17 +30,14 @@ const register = async (req, res) => {
     // Validate request body
     const { error } = registerSchema.validate(req.body);
     if (error) {
-      // Allow missing password for now (will be set later)
-      const details = error.details[0];
-      if (details.path[0] !== 'password') {
-        return res.status(400).json({
-          message: 'Validation error',
-          details: details.message
-        });
-      }
+      console.log('Validation error:', error.details); // Debug log
+      return res.status(400).json({
+        message: 'Validation error',
+        details: error.details[0].message
+      });
     }
     
-    const { name, email, phone, state, pincode, language, password } = req.body;
+    const { name, email, phone, state, pincode, language, password, referralId } = req.body;
     
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -71,6 +70,28 @@ const register = async (req, res) => {
     
     await franchise.save();
     
+    // Check if this user was referred by someone using the referral ID from the frontend
+    let referral = null;
+    if (referralId) {
+      // Find referral by ID and update it
+      referral = await Referral.findById(referralId);
+      if (referral && referral.referredEmail === email) {
+        // Update referral status to registered
+        referral.referredFranchiseId = franchise._id;
+        referral.status = 'registered';
+        await referral.save();
+      }
+    } else {
+      // Check if this user was referred by someone using email matching
+      referral = await Referral.findOne({ referredEmail: email, status: 'pending' });
+      if (referral) {
+        // Update referral status to registered
+        referral.referredFranchiseId = franchise._id;
+        referral.status = 'registered';
+        await referral.save();
+      }
+    }
+    
     // Send registration email to user
     try {
       await sendRegistrationEmail(user);
@@ -85,6 +106,16 @@ const register = async (req, res) => {
     } catch (emailError) {
       console.error('Failed to send registration notification to admin:', emailError);
       // Don't fail the registration if email sending fails
+    }
+    
+    // If this user was referred, send a confirmation email to the referrer
+    if (referral) {
+      try {
+        // We could implement this if needed, but for now we'll just log it
+        console.log(`User ${email} registered through referral ${referral._id}`);
+      } catch (emailError) {
+        console.error('Failed to send referral confirmation email:', emailError);
+      }
     }
     
     // Generate token

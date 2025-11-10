@@ -4,6 +4,8 @@ const Transaction = require('../models/Transaction');
 const Package = require('../models/Package');
 const CreditReport = require('../models/CreditReport');
 const Referral = require('../models/Referral');
+const Payout = require('../models/Payout');
+const { sendReferralEmail } = require('../utils/emailService');
 
 // Get franchise dashboard statistics
 const getFranchiseDashboard = async (req, res) => {
@@ -58,17 +60,10 @@ const getFranchiseDashboard = async (req, res) => {
   }
 };
 
-// Get leads for franchise
+// Get franchise leads
 const getFranchiseLeads = async (req, res) => {
   try {
-    // Get franchise
-    const franchise = await Franchise.findOne({ userId: req.user.id });
-    if (!franchise) {
-      return res.status(404).json({ message: 'Franchise not found' });
-    }
-    
-    // Get leads
-    const leads = await Lead.find({ franchiseId: franchise._id })
+    const leads = await Lead.find({ franchiseId: req.user.franchiseId })
       .sort({ createdAt: -1 });
     
     res.json(leads);
@@ -77,31 +72,15 @@ const getFranchiseLeads = async (req, res) => {
   }
 };
 
-// Create lead for franchise
+// Create lead
 const createLead = async (req, res) => {
   try {
-    // Get franchise
-    const franchise = await Franchise.findOne({ userId: req.user.id });
-    if (!franchise) {
-      return res.status(404).json({ message: 'Franchise not found' });
-    }
-    
-    // Check if franchise has enough credits
-    if (franchise.credits < 1) {
-      return res.status(400).json({ message: 'Insufficient credits to create lead' });
-    }
-    
-    // Create lead
     const lead = new Lead({
-      franchiseId: franchise._id,
       ...req.body,
+      franchiseId: req.user.franchiseId,
     });
     
     await lead.save();
-    
-    // Deduct credit
-    franchise.credits -= 1;
-    await franchise.save();
     
     res.status(201).json({
       message: 'Lead created successfully',
@@ -112,19 +91,12 @@ const createLead = async (req, res) => {
   }
 };
 
-// Get lead by ID for franchise
+// Get lead by ID
 const getFranchiseLeadById = async (req, res) => {
   try {
-    // Get franchise
-    const franchise = await Franchise.findOne({ userId: req.user.id });
-    if (!franchise) {
-      return res.status(404).json({ message: 'Franchise not found' });
-    }
-    
-    // Get lead
     const lead = await Lead.findOne({ 
       _id: req.params.id, 
-      franchiseId: franchise._id 
+      franchiseId: req.user.franchiseId 
     });
     
     if (!lead) {
@@ -137,23 +109,16 @@ const getFranchiseLeadById = async (req, res) => {
   }
 };
 
-// Update lead for franchise
+// Update lead
 const updateFranchiseLead = async (req, res) => {
   try {
-    // Get franchise
-    const franchise = await Franchise.findOne({ userId: req.user.id });
-    if (!franchise) {
-      return res.status(404).json({ message: 'Franchise not found' });
-    }
-    
-    // Update lead
     const lead = await Lead.findOneAndUpdate(
       { 
         _id: req.params.id, 
-        franchiseId: franchise._id 
+        franchiseId: req.user.franchiseId 
       },
       req.body,
-      { new: true, runValidators: true }
+      { new: true }
     );
     
     if (!lead) {
@@ -204,7 +169,8 @@ const getFranchiseReferrals = async (req, res) => {
     }
     
     const referrals = await Referral.find({ referrerFranchiseId: franchise._id })
-      .populate('referredFranchiseId', 'businessName');
+      .populate('referredFranchiseId', 'businessName')
+      .populate('packageId', 'name');
     
     res.json(referrals);
   } catch (error) {
@@ -224,26 +190,60 @@ const createReferral = async (req, res) => {
     // Check if referral already exists
     const existingReferral = await Referral.findOne({ 
       referrerFranchiseId: franchise._id,
-      referredEmail: req.body.referredEmail,
+      referredEmail: req.body.email,
     });
     
     if (existingReferral) {
       return res.status(400).json({ message: 'Referral already exists for this email' });
     }
     
-    // Create referral
+    // Create referral with proper field mapping
     const referral = new Referral({
       referrerFranchiseId: franchise._id,
-      ...req.body,
+      referredName: req.body.name,
+      referredEmail: req.body.email,
+      referredPhone: req.body.phone,
     });
     
     await referral.save();
+    
+    // Send referral email
+    try {
+      await sendReferralEmail(referral, franchise);
+    } catch (emailError) {
+      console.error('Failed to send referral email:', emailError);
+      // Don't fail the request if email sending fails
+    }
     
     res.status(201).json({
       message: 'Referral created successfully',
       referral,
     });
   } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+     
+// Get payouts for franchise
+const getFranchisePayouts = async (req, res) => {
+  try {
+    console.log('Fetching payouts for user:', req.user.id);
+    // Get franchise
+    const franchise = await Franchise.findOne({ userId: req.user.id });
+    if (!franchise) {
+      console.log('Franchise not found for user:', req.user.id);
+      return res.status(404).json({ message: 'Franchise not found' });
+    }
+    
+    console.log('Found franchise:', franchise._id);
+    const payouts = await Payout.find({ franchiseId: franchise._id })
+      .populate('processedBy', 'name')
+      .sort({ createdAt: -1 });
+    
+    console.log('Found payouts:', payouts.length);
+    res.json(payouts);
+  } catch (error) {
+    console.error('Error fetching payouts:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -258,4 +258,5 @@ module.exports = {
   getPackagesForPurchase,
   getFranchiseReferrals,
   createReferral,
+  getFranchisePayouts,
 };

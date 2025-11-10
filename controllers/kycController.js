@@ -1,8 +1,12 @@
 const KycRequest = require('../models/KycRequest');
 const Franchise = require('../models/Franchise');
 const User = require('../models/User');
+const Setting = require('../models/Setting');
 const Joi = require('joi');
+const axios = require('axios');
 const { sendKycApprovalEmail, sendKycRejectionEmail } = require('../utils/emailService');
+// Import the helper function from creditController
+const { getSurepassApiKeyValue } = require('./creditController');
 
 // Validation schema for KYC submission
 const kycSchema = Joi.object({
@@ -242,6 +246,78 @@ const rejectKyc = async (req, res) => {
   }
 };
 
+// Initialize DigiLocker SDK for franchise users
+const initializeDigiLocker = async (req, res) => {
+  try {
+    // Check if franchise exists
+    const franchise = await Franchise.findOne({ userId: req.user.id });
+    if (!franchise) {
+      return res.status(404).json({ message: 'Franchise not found' });
+    }
+
+    // Get Surepass API key (same as used for credit checks)
+    const apiKey = await getSurepassApiKeyValue();
+    
+    // Add debugging information
+    console.log('Retrieved API key:', apiKey ? 'API key found' : 'API key not found');
+    if (apiKey) {
+      console.log('API key length:', apiKey.length);
+      console.log('API key starts with:', apiKey.substring(0, 10));
+    }
+    
+    if (!apiKey) {
+      return res.status(500).json({ message: 'Surepass API key not configured' });
+    }
+
+    // Determine environment (use production by default, sandbox for development)
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const baseUrl = isDevelopment 
+      ? 'https://sandbox.surepass.app' 
+      : 'https://kyc-api.surepass.app';
+
+    console.log('Using baseUrl:', baseUrl);
+    console.log('Making request to:', `${baseUrl}/api/v1/digilocker/initialize`);
+
+    // Call Surepass API to initialize DigiLocker
+    const response = await axios.post(
+      `${baseUrl}/api/v1/digilocker/initialize`,
+      {
+        data: {
+          signup_flow: true,
+          skip_main_screen: false
+        }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('DigiLocker API response:', response.data);
+
+    // Return the token and client_id to the frontend
+    res.json({
+      success: true,
+      token: response.data.data.token,
+      clientId: response.data.data.client_id,
+      expirySeconds: response.data.data.expiry_seconds
+    });
+  } catch (error) {
+    console.error('DigiLocker initialization error:', error);
+    if (error.response) {
+      console.error('Error response data:', error.response.data);
+      console.error('Error response status:', error.response.status);
+      console.error('Error response headers:', error.response.headers);
+    }
+    res.status(500).json({ 
+      message: 'Failed to initialize DigiLocker', 
+      error: error.response?.data || error.message 
+    });
+  }
+};
+
 module.exports = {
   submitKyc,
   getKycStatus,
@@ -249,4 +325,5 @@ module.exports = {
   getPendingKycRequests,
   approveKyc,
   rejectKyc,
+  initializeDigiLocker  // Add the new function
 };

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Franchise = require('../models/Franchise');
 
 const auth = async (req, res, next) => {
   try {
@@ -25,9 +26,21 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Token invalid, access denied' });
     }
     
+    // If user is a franchise user, get their franchiseId
+    if (user.role === 'franchise_user') {
+      const franchise = await Franchise.findOne({ userId: user._id });
+      if (franchise) {
+        user.franchiseId = franchise._id;
+        console.log('Franchise ID set for user:', user._id, 'Franchise ID:', franchise._id);
+      } else {
+        console.log('No franchise found for user:', user._id);
+      }
+    }
+    
     req.user = user;
     next();
   } catch (error) {
+    console.error('Auth error:', error);
     res.status(401).json({ message: 'Token invalid, access denied' });
   }
 };

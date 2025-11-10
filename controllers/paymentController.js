@@ -6,6 +6,7 @@ const Franchise = require('../models/Franchise');
 const User = require('../models/User');
 const { sendPaymentSuccessEmail, sendAccountCredentialsEmail } = require('../utils/emailService');
 const bcrypt = require('bcryptjs');
+const { processReferralBonus } = require('../utils/referralUtils');
 
 // Initialize Razorpay instance
 console.log('Initializing Razorpay with key_id:', process.env.RAZORPAY_KEY_ID);
@@ -112,6 +113,9 @@ const verifyPayment = async (req, res) => {
         franchise.credits += pkg.creditsIncluded;
         franchise.totalCreditsPurchased += pkg.creditsIncluded;
         await franchise.save();
+        
+        // Process referral bonus if applicable
+        await processReferralBonus(franchise._id, pkg._id, pkg.price);
       }
     }
     

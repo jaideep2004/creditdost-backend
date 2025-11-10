@@ -1,8 +1,8 @@
-const Package = require('../models/Package');
+const CustomerPackage = require('../models/CustomerPackage');
 const Joi = require('joi');
 
-// Validation schema for creating/updating packages
-const packageSchema = Joi.object({
+// Validation schema for creating/updating customer packages
+const customerPackageSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   description: Joi.string().required(),
   price: Joi.number().min(0).required(),
@@ -16,30 +16,30 @@ const packageSchema = Joi.object({
   businessPayoutFixedAmount: Joi.number().min(0),
 });
 
-// Get all active packages
-const getPackages = async (req, res) => {
+// Get all active customer packages
+const getCustomerPackages = async (req, res) => {
   try {
-    const packages = await Package.find({ isActive: true }).sort({ sortOrder: 1 });
+    const packages = await CustomerPackage.find({ isActive: true }).sort({ sortOrder: 1 });
     res.json(packages);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// Get all packages (admin only)
-const getAllPackages = async (req, res) => {
+// Get all customer packages (admin only)
+const getAllCustomerPackages = async (req, res) => {
   try {
-    const packages = await Package.find().sort({ createdAt: -1 });
+    const packages = await CustomerPackage.find().sort({ createdAt: -1 });
     res.json(packages);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// Get package by ID
-const getPackageById = async (req, res) => {
+// Get customer package by ID
+const getCustomerPackageById = async (req, res) => {
   try {
-    const package = await Package.findById(req.params.id);
+    const package = await CustomerPackage.findById(req.params.id);
     
     if (!package) {
       return res.status(404).json({ message: 'Package not found' });
@@ -51,11 +51,11 @@ const getPackageById = async (req, res) => {
   }
 };
 
-// Create new package (admin only)
-const createPackage = async (req, res) => {
+// Create new customer package (admin only)
+const createCustomerPackage = async (req, res) => {
   try {
     // Validate request body
-    const { error } = packageSchema.validate(req.body);
+    const { error } = customerPackageSchema.validate(req.body);
     if (error) {
       return res.status(400).json({
         message: 'Validation error',
@@ -63,23 +63,23 @@ const createPackage = async (req, res) => {
       });
     }
     
-    const package = new Package(req.body);
-    await package.save();
+    const customerPackage = new CustomerPackage(req.body);
+    await customerPackage.save();
     
     res.status(201).json({
-      message: 'Package created successfully',
-      package
+      message: 'Customer package created successfully',
+      customerPackage
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// Update package (admin only)
-const updatePackage = async (req, res) => {
+// Update customer package (admin only)
+const updateCustomerPackage = async (req, res) => {
   try {
     // Validate request body
-    const { error } = packageSchema.validate(req.body);
+    const { error } = customerPackageSchema.validate(req.body);
     if (error) {
       return res.status(400).json({
         message: 'Validation error',
@@ -87,45 +87,45 @@ const updatePackage = async (req, res) => {
       });
     }
     
-    const package = await Package.findByIdAndUpdate(
+    const customerPackage = await CustomerPackage.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true, runValidators: true }
     );
     
-    if (!package) {
-      return res.status(404).json({ message: 'Package not found' });
+    if (!customerPackage) {
+      return res.status(404).json({ message: 'Customer package not found' });
     }
     
     res.json({
-      message: 'Package updated successfully',
-      package
+      message: 'Customer package updated successfully',
+      customerPackage
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// Delete package (admin only)
-const deletePackage = async (req, res) => {
+// Delete customer package (admin only)
+const deleteCustomerPackage = async (req, res) => {
   try {
-    const package = await Package.findByIdAndDelete(req.params.id);
+    const customerPackage = await CustomerPackage.findByIdAndDelete(req.params.id);
     
-    if (!package) {
-      return res.status(404).json({ message: 'Package not found' });
+    if (!customerPackage) {
+      return res.status(404).json({ message: 'Customer package not found' });
     }
     
-    res.json({ message: 'Package deleted successfully' });
+    res.json({ message: 'Customer package deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
 module.exports = {
-  getPackages,
-  getAllPackages,
-  getPackageById,
-  createPackage,
-  updatePackage,
-  deletePackage,
+  getCustomerPackages,
+  getAllCustomerPackages,
+  getCustomerPackageById,
+  createCustomerPackage,
+  updateCustomerPackage,
+  deleteCustomerPackage,
 };

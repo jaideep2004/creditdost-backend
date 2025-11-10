@@ -38,7 +38,7 @@ const transactionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['razorpay', 'paypal', 'stripe', 'bank_transfer'],
+    enum: ['razorpay', 'paypal', 'stripe', 'bank_transfer', 'admin_recharge'],
   },
   razorpayOrderId: {
     type: String,
@@ -48,6 +48,12 @@ const transactionSchema = new mongoose.Schema({
   },
   razorpaySignature: {
     type: String,
+  },
+  remarks: {
+    type: String,
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
   },
 }, {
   timestamps: true,

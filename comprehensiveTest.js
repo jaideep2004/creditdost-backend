@@ -11,7 +11,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/franchise
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
-
+ 
 const email = 'admin@gmail.com';
 const password = 'admin@123';
 

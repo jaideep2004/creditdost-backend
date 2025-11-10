@@ -6,6 +6,7 @@ const {
   getPendingKycRequests,
   approveKyc,
   rejectKyc,
+  initializeDigiLocker  // Add the new function
 } = require('../controllers/kycController');
 const auth = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
@@ -47,5 +48,10 @@ router.put('/approve/:id', auth, rbac('admin'), approveKyc);
 // @desc    Reject KYC request
 // @access  Private/Admin
 router.put('/reject/:id', auth, rbac('admin'), rejectKyc);
+
+// @route   POST /api/kyc/digilocker/init
+// @desc    Initialize DigiLocker SDK for franchise user
+// @access  Private/Franchise User
+router.post('/digilocker/init', auth, rbac('franchise_user'), initializeDigiLocker);
 
 module.exports = router;

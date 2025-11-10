@@ -10,14 +10,14 @@ dotenv.config();
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/franchise_management', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-});
+});   
 
 const email = 'admin@gmail.com';
 const password = 'admin@123';
 
 const debugPassword = async () => {
   try {
-    console.log('=== Password Debug Test ===');
+    console.log('=== Password Debug Test ==='); 
     
     // Find user
     console.log('\n1. Finding user...');

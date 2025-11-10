@@ -32,11 +32,24 @@ const referralSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  bonusAmount: {
+    type: Number,
+    default: 0,
+  },
+  packageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Package',
+  },
   creditedAt: {
     type: Date,
   },
 }, {
   timestamps: true,
 });
+
+// Method to generate referral link
+referralSchema.methods.getReferralLink = function() {
+  return `${process.env.FRONTEND_URL || 'http://localhost:5173'}/register?ref=${this._id}`;
+};
 
 module.exports = mongoose.model('Referral', referralSchema);

@@ -141,6 +141,137 @@ const sendPaymentSuccessEmail = async (user, transaction, pkg) => {
   return transporter.sendMail(mailOptions);
 };
 
+// Send lead assignment email to franchise user
+const sendLeadAssignmentEmail = async (franchiseUser, lead, adminUser) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: franchiseUser.email,
+    subject: 'New Lead Assigned - CreditDost Platform',
+    html: `
+      <h2>New Lead Assigned</h2>
+      <p>Hello ${franchiseUser.name},</p>
+      <p>A new lead has been assigned to you by the admin team:</p>
+      <p><strong>Lead Name:</strong> ${lead.name}</p>
+      <p><strong>Email:</strong> ${lead.email || 'N/A'}</p>
+      <p><strong>Phone:</strong> ${lead.phone}</p>
+      <p><strong>Assigned by:</strong> ${adminUser.name}</p>
+      <p>Please log in to the platform to view and manage this lead.</p>
+      <p><a href="${process.env.FRONTEND_URL}/franchise/leads">View Leads</a></p>
+      <p>Best regards,<br>The CreditDost Team</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send lead approval email to admin
+const sendLeadApprovalEmail = async (adminUser, lead, franchiseUser) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: adminUser.email,
+    subject: 'Lead Approved - CreditDost Platform',
+    html: `
+      <h2>Lead Approved</h2>
+      <p>Hello ${adminUser.name},</p>
+      <p>The following lead has been approved by the franchise user:</p>
+      <p><strong>Lead Name:</strong> ${lead.name}</p>
+      <p><strong>Email:</strong> ${lead.email || 'N/A'}</p>
+      <p><strong>Phone:</strong> ${lead.phone}</p>
+      <p><strong>Approved by:</strong> ${franchiseUser.name}</p>
+      <p><strong>Franchise:</strong> ${franchiseUser.franchise?.businessName || 'N/A'}</p>
+      <p>Please log in to the admin dashboard to view the updated lead status.</p>
+      <p><a href="${process.env.FRONTEND_URL}/admin/leads">View Leads</a></p>
+      <p>Best regards,<br>The CreditDost System</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send lead rejection email to admin
+const sendLeadRejectionEmail = async (adminUser, lead, franchiseUser, reason) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: adminUser.email,
+    subject: 'Lead Rejected - CreditDost Platform',
+    html: `
+      <h2>Lead Rejected</h2>
+      <p>Hello ${adminUser.name},</p>
+      <p>The following lead has been rejected by the franchise user:</p>
+      <p><strong>Lead Name:</strong> ${lead.name}</p>
+      <p><strong>Email:</strong> ${lead.email || 'N/A'}</p>
+      <p><strong>Phone:</strong> ${lead.phone}</p>
+      <p><strong>Rejected by:</strong> ${franchiseUser.name}</p>
+      <p><strong>Franchise:</strong> ${franchiseUser.franchise?.businessName || 'N/A'}</p>
+      <p><strong>Reason:</strong> ${reason}</p>
+      <p>Please log in to the admin dashboard to view the updated lead status.</p>
+      <p><a href="${process.env.FRONTEND_URL}/admin/leads">View Leads</a></p>
+      <p>Best regards,<br>The CreditDost System</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send business form submission email
+const sendBusinessFormSubmissionEmail = async (recipient, businessForm, franchise) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: recipient.email,
+    subject: 'New Business Form Submission - CreditDost Platform',
+    html: `
+      <h2>New Business Form Submission</h2>
+      <p>Hello ${recipient.name},</p>
+      <p>A new business form has been submitted with the following details:</p>
+      <p><strong>Customer Name:</strong> ${businessForm.customerName}</p>
+      <p><strong>Customer Email:</strong> ${businessForm.customerEmail}</p>
+      <p><strong>Customer Phone:</strong> ${businessForm.customerPhone}</p>
+      <p><strong>PAN Number:</strong> ${businessForm.panNumber}</p>
+      <p><strong>Aadhar Number:</strong> ${businessForm.aadharNumber}</p>
+      <p><strong>State:</strong> ${businessForm.state}</p>
+      <p><strong>Package Selected:</strong> ${businessForm.selectedPackage?.name || 'N/A'}</p>
+      <p><strong>Franchise:</strong> ${franchise?.businessName || 'N/A'}</p>
+      <p>Payment has been successfully processed.</p>
+      <p>Please log in to the platform to view the complete details.</p>
+      <p>Best regards,<br>The CreditDost Team</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send referral email to referred user
+const sendReferralEmail = async (referral, referrerFranchise) => {
+  // Generate referral link
+  const referralLink = referral.getReferralLink();
+  
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: referral.referredEmail,
+    subject: 'Franchise Opportunity - CreditDost Platform',
+    html: `
+      <h2>Franchise Opportunity from CreditDost!</h2>
+      <p>Hello ${referral.referredName},</p>
+      <p>Your friend ${referrerFranchise.ownerName} (${referrerFranchise.email}) has referred you to join CreditDost as a franchise partner.</p>
+      <p>CreditDost is a leading platform for credit verification services, helping businesses make informed decisions.</p>
+      <p><strong>Benefits of joining:</strong></p>
+      <ul>
+        <li>Access to multiple credit bureaus (CIBIL, CRIF, Experian, Equifax)</li>
+        <li>Competitive pricing and revenue sharing</li>
+        <li>Comprehensive dashboard and reporting tools</li>
+        <li>Dedicated support team</li>
+      </ul>
+      <p>To get started, click the link below:</p>
+      <p><a href="${referralLink}" style="background-color: #6200ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Register as Franchise Partner</a></p>
+      <p>Or copy and paste this link in your browser: ${referralLink}</p>
+      <p>If you have any questions, feel free to contact us at ${process.env.EMAIL_USER}.</p>
+      <p>Best regards,<br>The CreditDost Team</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
 module.exports = {
   sendRegistrationEmail,
   sendAdminNotificationEmail,
@@ -148,4 +279,9 @@ module.exports = {
   sendKycRejectionEmail,
   sendAccountCredentialsEmail,
   sendPaymentSuccessEmail,
+  sendLeadAssignmentEmail,
+  sendLeadApprovalEmail,
+  sendLeadRejectionEmail,
+  sendBusinessFormSubmissionEmail,
+  sendReferralEmail,
 };

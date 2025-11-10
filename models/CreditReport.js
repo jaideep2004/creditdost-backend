@@ -53,6 +53,9 @@ const creditReportSchema = new mongoose.Schema({
   reportUrl: {
     type: String,
   },
+  localPath: {
+    type: String,
+  },
 }, {
   timestamps: true,
 });

@@ -7,6 +7,8 @@ const Payout = require('../models/Payout');
 const Referral = require('../models/Referral');
 const CreditReport = require('../models/CreditReport');
 const Setting = require('../models/Setting');
+const BusinessForm = require('../models/BusinessForm');
+const { sendLeadAssignmentEmail } = require('../utils/emailService');
 
 // Get dashboard statistics
 const getDashboardStats = async (req, res) => {
@@ -98,9 +100,9 @@ const getRecentActivities = async (req, res) => {
       });
     });
     
-    // Sort by time and limit to 10 most recent
+    // Sort by time and limit to 5 most recent
     activities.sort((a, b) => new Date(b.time) - new Date(a.time));
-    const recentActivities = activities.slice(0, 10);
+    const recentActivities = activities.slice(0, 5);
     
     res.json(recentActivities);
   } catch (error) {
@@ -155,6 +157,60 @@ const updateUser = async (req, res) => {
   }
 };
 
+// Create lead (admin only)
+const createLead = async (req, res) => {
+  try {
+    const { 
+      franchiseId, 
+      name, 
+      email, 
+      phone, 
+      address, 
+      creditScore,
+      creditReportUrl,
+      assignedTo,
+      notes
+    } = req.body;
+    
+    // Validate required fields
+    if (!name || !phone) {
+      return res.status(400).json({ 
+        message: 'Name and phone are required' 
+      });
+    }
+    
+    // Create new lead
+    const lead = new Lead({
+      franchiseId: franchiseId || undefined, // Make franchiseId optional
+      name,
+      email: email ? email.toLowerCase() : undefined,
+      phone,
+      address,
+      creditScore,
+      creditReportUrl,
+      assignedTo,
+      notes: notes ? [{
+        note: notes,
+        createdBy: req.user.id,
+        createdAt: new Date()
+      }] : undefined
+    });
+    
+    await lead.save();
+    
+    // Populate references
+    await lead.populate('franchiseId', 'businessName');
+    await lead.populate('assignedTo', 'name');
+    
+    res.status(201).json({
+      message: 'Lead created successfully',
+      lead,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // Get all leads (admin only)
 const getAllLeads = async (req, res) => {
   try {
@@ -198,6 +254,27 @@ const updateLead = async (req, res) => {
     
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });
+    }
+    
+    // Send email notification if franchiseId was updated (lead assigned)
+    if (req.body.franchiseId) {
+      try {
+        // Get the franchise user
+        const franchise = await Franchise.findById(req.body.franchiseId);
+        if (franchise) {
+          const franchiseUser = await User.findById(franchise.userId);
+          if (franchiseUser) {
+            // Get the admin user who made the assignment
+            const adminUser = await User.findById(req.user.id);
+            
+            // Send assignment email
+            await sendLeadAssignmentEmail(franchiseUser, lead, adminUser);
+          }
+        }
+      } catch (emailError) {
+        console.error('Failed to send lead assignment email:', emailError);
+        // Don't fail the request if email sending fails
+      }
     }
     
     res.json({
@@ -292,9 +369,63 @@ const getAllReferrals = async (req, res) => {
     const referrals = await Referral.find()
       .populate('referrerFranchiseId', 'businessName ownerName')
       .populate('referredFranchiseId', 'businessName ownerName')
+      .populate('packageId', 'name')
       .sort({ createdAt: -1 });
     
     res.json(referrals);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get referral settings (admin only)
+const getReferralSettings = async (req, res) => {
+  try {
+    const settings = await Setting.findOne({ key: 'referral_bonus_settings' });
+    
+    if (!settings) {
+      return res.json({ value: [] });
+    }
+    
+    // Populate package names in the settings
+    const populatedSettings = [];
+    for (const setting of settings.value) {
+      const pkg = await Package.findById(setting.packageId);
+      populatedSettings.push({
+        ...setting,
+        packageName: pkg ? pkg.name : 'Unknown Package'
+      });
+    }
+    
+    res.json({ value: populatedSettings });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Update referral settings (admin only)
+const updateReferralSettings = async (req, res) => {
+  try {
+    const { value } = req.body;
+    
+    let settings = await Setting.findOne({ key: 'referral_bonus_settings' });
+    
+    if (settings) {
+      settings.value = value;
+      await settings.save();
+    } else {
+      settings = new Setting({
+        key: 'referral_bonus_settings',
+        value,
+        description: 'Referral bonus percentages by package'
+      });
+      await settings.save();
+    }
+    
+    res.json({
+      message: 'Referral settings updated successfully',
+      settings,
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -353,12 +484,233 @@ const updateSetting = async (req, res) => {
   }
 };
 
+// Get all franchises with credit information (admin only)
+const getAllFranchisesWithCredits = async (req, res) => {
+  try {
+    const franchises = await Franchise.find({ isActive: true })
+      .select('businessName credits totalCreditsPurchased kycStatus')
+      .sort({ businessName: 1 });
+    
+    res.json(franchises);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Recharge credits for a franchise (admin only)
+const rechargeFranchiseCredits = async (req, res) => {
+  try {
+    const { franchiseId, credits, remarks } = req.body;
+    
+    // Validate input
+    if (!franchiseId || credits === undefined || credits <= 0) {
+      return res.status(400).json({ 
+        message: 'Franchise ID and positive credits amount are required' 
+      });
+    }
+    
+    // Find the franchise
+    const franchise = await Franchise.findById(franchiseId);
+    if (!franchise) {
+      return res.status(404).json({ message: 'Franchise not found' });
+    }
+    
+    // Update credits
+    const oldCredits = franchise.credits;
+    franchise.credits += credits;
+    franchise.totalCreditsPurchased += credits;
+    await franchise.save();
+    
+    // Log the transaction (optional)
+    const transaction = new Transaction({
+      userId: franchise.userId,
+      amount: 0, // Free recharge
+      currency: 'INR',
+      status: 'paid',
+      paymentMethod: 'admin_recharge',
+      remarks: remarks || `Admin credit recharge: ${credits} credits`,
+      metadata: {
+        adminId: req.user.id,
+        oldCredits,
+        newCredits: franchise.credits,
+        creditsAdded: credits
+      }
+    });
+    
+    await transaction.save();
+    
+    res.json({
+      message: 'Credits recharged successfully',
+      franchise: {
+        id: franchise._id,
+        businessName: franchise.businessName,
+        credits: franchise.credits,
+        totalCreditsPurchased: franchise.totalCreditsPurchased
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get credit recharge history (admin only)
+const getCreditRechargeHistory = async (req, res) => {
+  try {
+    const transactions = await Transaction.find({
+      paymentMethod: 'admin_recharge'
+    })
+    .populate('userId', 'name email')
+    .sort({ createdAt: -1 })
+    .limit(50);
+    
+    res.json(transactions);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Calculate payouts for a franchise (admin only)
+const calculateFranchisePayouts = async (req, res) => {
+  try {
+    const { franchiseId, periodStart, periodEnd } = req.body;
+    
+    // Validate input
+    if (!franchiseId || !periodStart || !periodEnd) {
+      return res.status(400).json({ 
+        message: 'Franchise ID, period start, and period end are required' 
+      });
+    }
+    
+    // Validate dates
+    const startDate = new Date(periodStart);
+    const endDate = new Date(periodEnd);
+    
+    if (isNaN(startDate) || isNaN(endDate)) {
+      return res.status(400).json({ 
+        message: 'Invalid date format' 
+      });
+    }
+    
+    if (startDate >= endDate) {
+      return res.status(400).json({ 
+        message: 'Period start must be before period end' 
+      });
+    }
+    
+    // Find the franchise
+    const franchise = await Franchise.findById(franchiseId);
+    if (!franchise) {
+      return res.status(404).json({ message: 'Franchise not found' });
+    }
+    
+    // Get business forms (customer packages sold) during the period
+    const businessForms = await BusinessForm.find({
+      franchiseId: franchiseId,
+      paymentStatus: 'paid',
+      createdAt: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    }).populate('selectedPackage');
+    
+    // Calculate business payout based on customer packages sold
+    let totalBusinessPayout = 0;
+    let creditsGenerated = 0;
+    
+    for (const form of businessForms) {
+      if (form.selectedPackage) {
+        creditsGenerated += form.selectedPackage.creditsIncluded || 0;
+        
+        // Calculate business payout based on customer package settings
+        const customerPackage = form.selectedPackage;
+        if (customerPackage.businessPayoutType === 'percentage') {
+          totalBusinessPayout += (customerPackage.price * (customerPackage.businessPayoutPercentage || 20)) / 100;
+        } else {
+          totalBusinessPayout += customerPackage.businessPayoutFixedAmount || 0;
+        }
+      }
+    }
+    
+    // Get credit reports generated during the period (as a measure of business done)
+    const creditReports = await CreditReport.find({
+      franchiseId: franchiseId,
+      createdAt: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    });
+    
+    // Additional business metrics could be added here
+    // For now, we'll use credit reports as a proxy for business activity
+    
+    // Calculate referral bonuses
+    const referrals = await Referral.find({
+      referrerFranchiseId: franchiseId,
+      status: 'credited',
+      creditedAt: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    });
+    
+    let referralBonus = 0;
+    referrals.forEach(referral => {
+      referralBonus += referral.bonusAmount || 0;
+    });
+    
+    // Calculate total payout amount
+    // Package business payout + referral bonuses
+    const totalAmount = totalBusinessPayout + referralBonus;
+    
+    // Create payout record
+    const payout = new Payout({
+      franchiseId: franchiseId,
+      amount: totalBusinessPayout,
+      periodStart: startDate,
+      periodEnd: endDate,
+      creditsGenerated: creditsGenerated,
+      referralBonus: referralBonus,
+      totalAmount: totalAmount,
+      status: 'pending'
+    });
+    
+    await payout.save();
+    
+    // Populate franchise details
+    await payout.populate('franchiseId', 'businessName ownerName');
+    
+    res.json({
+      message: 'Payout calculated successfully',
+      payout
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get payouts for a specific franchise (admin only)
+const getFranchisePayouts = async (req, res) => {
+  try {
+    const { franchiseId } = req.params;
+    
+    const payouts = await Payout.find({ franchiseId })
+      .populate('franchiseId', 'businessName ownerName')
+      .populate('processedBy', 'name')
+      .sort({ createdAt: -1 });
+    
+    res.json(payouts);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getRecentActivities,
   getAllUsers,
   getUserById,
   updateUser,
+  createLead,
   getAllLeads,
   getLeadById,
   updateLead,
@@ -367,7 +719,14 @@ module.exports = {
   getAllPayouts,
   updatePayout,
   getAllReferrals,
+  getReferralSettings,
+  updateReferralSettings,
   getAllCreditReportsAdmin,
   getSettings,
   updateSetting,
+  getAllFranchisesWithCredits,
+  rechargeFranchiseCredits,
+  getCreditRechargeHistory,
+  calculateFranchisePayouts,
+  getFranchisePayouts,
 };
