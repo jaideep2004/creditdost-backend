@@ -31,6 +31,19 @@ const payoutSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  // New fields for TDS calculation
+  grossAmount: {
+    type: Number,
+    required: false,
+  },
+  tdsAmount: {
+    type: Number,
+    required: false,
+  },
+  tdsPercentage: {
+    type: Number,
+    default: 2, // 2% TDS
+  },
   status: {
     type: String,
     enum: ['pending', 'processing', 'completed', 'failed'],

@@ -5,17 +5,35 @@ const Franchise = require("../models/Franchise");
 const Joi = require("joi");
 const fs = require("fs");
 const path = require("path");
+const { sendCreditReportEmail } = require("../utils/emailService");
+const googleSheetsService = require("../utils/googleSheetsService");
 
 // Validation schema for credit check
 const creditCheckSchema = Joi.object({
-  name: Joi.string().min(2).max(100).required(),
+  name: Joi.string().min(2).max(100).required().messages({
+    'string.min': 'Customer name must be at least 2 characters long',
+    'string.max': 'Customer name must be less than 100 characters long',
+    'any.required': 'Customer name is required'
+  }),
   mobile: Joi.string()
     .pattern(/^[0-9]{10}$/)
-    .required(),
+    .required()
+    .messages({
+      'string.pattern.base': 'Mobile number must be exactly 10 digits',
+      'any.required': 'Mobile number is required'
+    }),
+  email: Joi.string()
+    .email()
+    .messages({
+      'string.email': 'Please provide a valid email address'
+    }),
   personId: Joi.string().optional(),
   bureau: Joi.string()
     .valid("equifax", "experian", "cibil", "crif")
-    .default("cibil"),
+    .default("cibil")
+    .messages({
+      'any.only': 'Please select a valid credit bureau (equifax, experian, cibil, crif)'
+    }),
   pan: Joi.string().optional(),
   aadhaar: Joi.string().optional(),
   dob: Joi.date().optional(),
@@ -123,11 +141,12 @@ const getBureauConfig = (bureau) => {
 const checkCreditScore = async (req, res) => {
   try {
     // Validate request body
-    const { error } = creditCheckSchema.validate(req.body);
+    const { error } = creditCheckSchema.validate(req.body, { abortEarly: false });
     if (error) {
+      const errorMessages = error.details.map(detail => detail.message);
       return res.status(400).json({
         message: "Validation error",
-        details: error.details[0].message,
+        details: errorMessages,
       });
     }
 
@@ -261,6 +280,14 @@ const checkCreditScore = async (req, res) => {
 
     await creditReport.save();
 
+    // Sync with Google Sheets
+    try {
+      await googleSheetsService.initialize();
+      await googleSheetsService.syncCreditScoreData();
+    } catch (syncError) {
+      console.error('Failed to sync credit score data with Google Sheets:', syncError);
+    }
+
     // Deduct credit from franchise
     franchise.credits -= 1;
     await franchise.save();
@@ -324,7 +351,196 @@ const checkCreditScore = async (req, res) => {
     });
   } catch (error) {
     console.error("Credit check error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ 
+      message: "Server error", 
+      error: error.message,
+      // Don't expose sensitive error details in production
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+    });
+  }
+};
+
+// Check credit score for specific bureau (public version for Experian only)
+const checkCreditScorePublic = async (req, res) => {
+  try {
+    // Validate request body
+    const { error } = creditCheckSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      const errorMessages = error.details.map(detail => detail.message);
+      return res.status(400).json({
+        message: "Validation error",
+        details: errorMessages,
+      });
+    }
+
+    const {
+      name,
+      mobile,
+      email, // Add email
+      personId,
+      bureau = "experian",
+      pan,
+      aadhaar,
+      dob,
+      gender,
+    } = req.body;
+
+    // Only allow Experian for public access
+    if (bureau !== "experian") {
+      return res.status(400).json({ 
+        message: "Only Experian credit reports are available for public access" 
+      });
+    }
+
+    // Get Surepass API key
+    const apiKey = await getSurepassApiKeyValue();
+    if (!apiKey) {
+      return res
+        .status(500)
+        .json({ message: "Surepass API key not configured" });
+    }
+
+    // Get the appropriate endpoint and data formatter for the bureau
+    const bureauConfig = getBureauConfig(bureau);
+
+    // Prepare request data based on bureau requirements
+    const requestData = bureauConfig.formatData({
+      name,
+      mobile,
+      personId,
+      pan,
+      aadhaar,
+      dob,
+      gender,
+    });
+
+    // Make request to Surepass API with timeout and better error handling
+    let response;
+    try {
+      response = await axios.post(bureauConfig.endpoint, requestData, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 30000, // 30 second timeout
+      });
+    } catch (apiError) {
+      console.error("Surepass API error:", apiError.message);
+
+      // Handle timeout specifically
+      if (apiError.code === "ETIMEDOUT" || apiError.code === "ECONNABORTED") {
+        return res.status(504).json({
+          message:
+            "Request timeout when connecting to credit bureau. Please try again later.",
+          error: "TIMEOUT_ERROR",
+        });
+      }
+
+      // Handle network errors
+      if (apiError.isAxiosError && !apiError.response) {
+        return res.status(502).json({
+          message:
+            "Network error when connecting to credit bureau. Please check your internet connection and try again.",
+          error: "NETWORK_ERROR",
+        });
+      }
+
+      // Forward the error from Surepass API if available
+      if (apiError.response) {
+        return res.status(apiError.response.status).json({
+          message: "Credit check failed",
+          error: apiError.response.data || apiError.message,
+        });
+      }
+
+      // Generic error
+      return res.status(500).json({
+        message: "An error occurred while checking credit score",
+        error: apiError.message,
+      });
+    }
+
+    // Extract score from response based on bureau
+    let score = null;
+    if (response.data.data && response.data.data.score) {
+      score = response.data.data.score;
+    } else if (response.data.data && response.data.data.credit_score) {
+      score = response.data.data.credit_score;
+    }
+
+    // Extract report URL from response
+    let reportUrl = null;
+    if (response.data.data) {
+      // Check for various possible report URL fields
+      reportUrl =
+        response.data.data.report_url ||
+        response.data.data.pdf_url ||
+        response.data.data.credit_report_link ||
+        response.data.data.report_link ||
+        null;
+    }
+
+    // Save credit report without user/franchise association for public reports
+    const creditReport = new CreditReport({
+      name,
+      mobile,
+      email, // Add email
+      pan,
+      aadhaar,
+      dob,
+      gender,
+      score,
+      bureau,
+      reportData: response.data,
+      reportUrl: reportUrl,
+      isPublic: true, // Mark as public report
+    });
+
+    await creditReport.save();
+
+    // Send email to user and admin
+    try {
+      // Send email to user
+      await sendCreditReportEmail(
+        { email: email, name: name }, // Use the email from request
+        creditReport,
+        reportUrl
+      );
+      
+      // Send email to admin
+      await sendCreditReportEmail(
+        { email: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, name: "Admin" },
+        creditReport,
+        reportUrl
+      );
+    } catch (emailError) {
+      console.error("Error sending email:", emailError);
+      // Don't fail the request if email sending fails
+    }
+
+    res.json({
+      message: `Credit report retrieved successfully from ${bureau.toUpperCase()}`,
+      creditReport: {
+        id: creditReport._id,
+        name: creditReport.name,
+        mobile: creditReport.mobile,
+        pan: creditReport.pan,
+        aadhaar: creditReport.aadhaar,
+        score: creditReport.score,
+        bureau: creditReport.bureau,
+        reportUrl: creditReport.reportUrl,
+        localPath: creditReport.localPath,
+        createdAt: creditReport.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error("Credit check error:", error);
+    res.status(500).json({ 
+      message: "Server error", 
+      error: error.message,
+      // Don't expose sensitive error details in production
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+    });
   }
 };
 
@@ -410,6 +626,7 @@ const updateSurepassApiKey = async (req, res) => {
 
 module.exports = {
   checkCreditScore,
+  checkCreditScorePublic, // Add the new public function
   getCreditReports,
   getAllCreditReports,
   getCreditReportById,

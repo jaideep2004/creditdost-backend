@@ -10,9 +10,10 @@ const { sendReferralEmail } = require('../utils/emailService');
 // Get franchise dashboard statistics
 const getFranchiseDashboard = async (req, res) => {
   try {
-    // Get franchise details
+    // Get franchise details with assigned packages
     const franchise = await Franchise.findOne({ userId: req.user.id })
-      .populate('userId', 'name email phone');
+      .populate('userId', 'name email phone')
+      .populate('assignedPackages', 'name creditsIncluded');
     
     if (!franchise) {
       return res.status(404).json({ message: 'Franchise not found' });

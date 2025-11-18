@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { sendBusinessFormSubmissionEmail } = require('../utils/emailService');
+const googleSheetsService = require('../utils/googleSheetsService');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -103,6 +104,14 @@ const submitBusinessForm = async (req, res) => {
     
     await businessForm.save();
     
+    // Sync with Google Sheets
+    try {
+      await googleSheetsService.initialize();
+      await googleSheetsService.syncBusinessFormData();
+    } catch (syncError) {
+      console.error('Failed to sync business form data with Google Sheets:', syncError);
+    }
+    
     // Create Razorpay order
     const options = {
       amount: customerPackage.price * 100, // amount in paise
@@ -195,7 +204,7 @@ const verifyPayment = async (req, res) => {
 const getFranchiseBusinessForms = async (req, res) => {
   try {
     const businessForms = await BusinessForm.find({ franchiseId: req.user.franchiseId })
-      .populate('selectedPackage', 'name price')
+      .populate('selectedPackage', 'name price businessPayoutPercentage businessPayoutType businessPayoutFixedAmount')
       .populate('franchiseId', 'businessName')
       .sort({ createdAt: -1 });
     
@@ -209,7 +218,7 @@ const getFranchiseBusinessForms = async (req, res) => {
 const getAllBusinessForms = async (req, res) => {
   try {
     const businessForms = await BusinessForm.find()
-      .populate('selectedPackage', 'name price')
+      .populate('selectedPackage', 'name price businessPayoutPercentage businessPayoutType businessPayoutFixedAmount')
       .populate('franchiseId', 'businessName')
       .sort({ createdAt: -1 });
     

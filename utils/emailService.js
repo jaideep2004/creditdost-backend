@@ -33,6 +33,7 @@ const sendRegistrationEmail = async (user) => {
       <p>Hello ${user.name},</p>
       <p>Thank you for registering as a franchise partner with CreditDost.</p>
       <p>Your registration is currently pending approval. Our team will review your application and get back to you soon.</p>
+      <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
       <p>Best regards,<br>The CreditDost Team</p>
     `,
   };
@@ -62,8 +63,70 @@ const sendAdminNotificationEmail = async (user) => {
   return transporter.sendMail(mailOptions);
 };
 
+// Send self-registration welcome email
+const sendSelfRegistrationEmail = async (user, franchise) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: user.email,
+    subject: 'Welcome to CreditDost Franchise Platform',
+    html: `
+      <h2>Welcome to CreditDost!</h2>
+      <p>Hello ${user.name},</p>
+      <p>Thank you for registering as a franchise partner with CreditDost.</p>
+      <p>Your registration is currently pending admin approval. You will receive login credentials via email once your registration is approved.</p>
+      <p>In the meantime, join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
+      <p>Best regards,<br>The CreditDost Team</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send registration approval email
+const sendRegistrationApprovalEmail = async (user, franchise, password) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: user.email,
+    subject: 'Registration Approved - CreditDost Franchise Platform',
+    html: `
+      <h2>Registration Approved!</h2>
+      <p>Hello ${user.name},</p>
+      <p>Congratulations! Your registration has been approved.</p>
+      <p>Your account is now active. Here are your login credentials:</p>
+      <p><strong>Email:</strong> ${user.email}</p>
+      <p><strong>Password:</strong> ${password || 'Your previously set password'}</p>
+      <p>Please log in and change your password for security.</p>
+      <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>
+      <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
+      <p>You can now access all the features of the CreditDost franchise platform.</p>
+      <p>Best regards,<br>The CreditDost Team</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send registration rejection email
+const sendRegistrationRejectionEmail = async (user, franchise, reason) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: user.email,
+    subject: 'Registration Review - CreditDost Franchise Platform',
+    html: `
+      <h2>Registration Review Required</h2>
+      <p>Hello ${user.name},</p>
+      <p>We've reviewed your registration, but unfortunately, we need some corrections:</p>
+      <p><strong>Reason:</strong> ${reason}</p>
+      <p>Please contact our support team for more information.</p>
+      <p>Best regards,<br>The CreditDost Team</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
 // Send KYC approval email
-const sendKycApprovalEmail = async (user, franchise) => {
+const sendKycApprovalEmail = async (user, franchise, password) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: user.email,
@@ -72,6 +135,12 @@ const sendKycApprovalEmail = async (user, franchise) => {
       <h2>KYC Approved!</h2>
       <p>Hello ${user.name},</p>
       <p>Congratulations! Your KYC documents have been approved.</p>
+      ${password ? `<p>Your account credentials have been updated. Here are your login credentials:</p>
+      <p><strong>Email:</strong> ${user.email}</p>
+      <p><strong>Password:</strong> ${password}</p>
+      <p>Please log in and change your password for security.</p>
+      <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>` : ''}
+      <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
       <p>You can now access all the features of the CreditDost franchise platform.</p>
       <p>Best regards,<br>The CreditDost Team</p>
     `,
@@ -113,6 +182,7 @@ const sendAccountCredentialsEmail = async (user, password) => {
       <p><strong>Password:</strong> ${password}</p>
       <p>Please log in and change your password for security.</p>
       <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>
+      <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
       <p>Best regards,<br>The CreditDost Team</p>
     `,
   };
@@ -272,9 +342,91 @@ const sendReferralEmail = async (referral, referrerFranchise) => {
   return transporter.sendMail(mailOptions);
 };
 
+// Send credit report email to user and admin
+const sendCreditReportEmail = async (recipient, creditReport, reportUrl) => {
+  // Validate recipient object
+  if (!recipient || !recipient.email) {
+    throw new Error('Recipient email is required');
+  }
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: recipient.email,
+    subject: `Your Experian Credit Report - CreditDost`,
+    html: `
+      <h2>Your Experian Credit Report</h2>
+      <p>Hello ${recipient.name || 'User'},</p>
+      <p>Your Experian credit report has been successfully generated.</p>
+      <p><strong>Report Details:</strong></p>
+      <ul>
+        <li>Name: ${creditReport.name}</li>
+        <li>Mobile: ${creditReport.mobile}</li>
+        <li>Email: ${recipient.email}</li>
+        <li>PAN: ${creditReport.pan || 'Not provided'}</li>
+        <li>Credit Score: ${creditReport.score || 'Not available'}</li>
+        <li>Bureau: ${creditReport.bureau ? creditReport.bureau.toUpperCase() : 'Experian'}</li>
+      </ul>
+      ${reportUrl ? `<p><a href="${reportUrl}" style="background-color: #6200ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Download Report</a></p>` : ''}
+      <p>If you have any questions, feel free to contact us at ${process.env.EMAIL_USER}.</p>
+      <p>Best regards,<br>The CreditDost Team</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send contact form submission email to admin
+const sendContactFormEmail = async (contactForm) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Send to admin email or fallback to sender email
+    subject: `New Contact Form Submission - CreditDost`,
+    html: `
+      <h2>New Contact Form Submission</h2>
+      <p>A new contact form has been submitted with the following details:</p>
+      <p><strong>Name:</strong> ${contactForm.name}</p>
+      <p><strong>Email:</strong> ${contactForm.email}</p>
+      <p><strong>Subject:</strong> ${contactForm.subject || 'No subject provided'}</p>
+      <p><strong>Message:</strong></p>
+      <p>${contactForm.message}</p>
+      <p>Best regards,<br>The CreditDost System</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send franchise opportunity form submission email to admin
+const sendFranchiseOpportunityEmail = async (franchiseOpportunity) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Send to admin email or fallback to sender email
+    subject: `New Franchise Opportunity Submission - CreditDost`,
+    html: `
+      <h2>New Franchise Opportunity Submission</h2>
+      <p>A new franchise opportunity form has been submitted with the following details:</p>
+      <p><strong>Full Name:</strong> ${franchiseOpportunity.fullName}</p>
+      <p><strong>Email:</strong> ${franchiseOpportunity.email}</p>
+      <p><strong>Mobile Number:</strong> ${franchiseOpportunity.mobileNumber}</p>
+      <p><strong>City:</strong> ${franchiseOpportunity.city}</p>
+      <p><strong>State:</strong> ${franchiseOpportunity.state}</p>
+      <p><strong>Profession:</strong> ${franchiseOpportunity.profession}</p>
+      <p><strong>Message:</strong></p>
+      <p>${franchiseOpportunity.message || 'No message provided'}</p>
+      <p><strong>Consent:</strong> ${franchiseOpportunity.consent ? 'Yes' : 'No'}</p>
+      <p>Best regards,<br>The CreditDost System</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
 module.exports = {
   sendRegistrationEmail,
   sendAdminNotificationEmail,
+  sendSelfRegistrationEmail,
+  sendRegistrationApprovalEmail,
+  sendRegistrationRejectionEmail,
   sendKycApprovalEmail,
   sendKycRejectionEmail,
   sendAccountCredentialsEmail,
@@ -284,4 +436,7 @@ module.exports = {
   sendLeadRejectionEmail,
   sendBusinessFormSubmissionEmail,
   sendReferralEmail,
+  sendCreditReportEmail, // Add the new email function
+  sendContactFormEmail,
+  sendFranchiseOpportunityEmail,
 };

@@ -31,6 +31,16 @@ const kycRequestSchema = new mongoose.Schema({
   businessRegistrationDocument: {
     type: String, // URL to document
   },
+  // New fields for DigiLocker submissions
+  isDigiLockerSubmission: {
+    type: Boolean,
+    default: false,
+  },
+  submissionMethod: {
+    type: String,
+    enum: ['manual', 'digilocker'],
+    default: 'manual',
+  },
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],

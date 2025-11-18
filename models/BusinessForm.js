@@ -4,7 +4,7 @@ const businessFormSchema = new mongoose.Schema({
   franchiseId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Franchise',
-    required: true,
+    required: false, // Make optional for public submissions
   },
   customerName: {
     type: String,
@@ -28,6 +28,10 @@ const businessFormSchema = new mongoose.Schema({
   aadharNumber: {
     type: String,
     required: true,
+  },
+  city: {
+    type: String,
+    required: false, // Optional for existing forms
   },
   pincode: {
     type: String,
@@ -57,7 +61,7 @@ const businessFormSchema = new mongoose.Schema({
   selectedPackage: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CustomerPackage',
-    required: true,
+    required: false, // Make optional for public submissions
   },
   paymentId: {
     type: String,

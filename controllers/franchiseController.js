@@ -1,5 +1,6 @@
 const Franchise = require('../models/Franchise');
 const User = require('../models/User');
+const Package = require('../models/Package');
 const Joi = require('joi');
 
 // Validation schema for updating franchise profile
@@ -68,6 +69,7 @@ const getAllFranchises = async (req, res) => {
   try {
     const franchises = await Franchise.find()
       .populate('userId', 'name email phone')
+      .populate('assignedPackages', 'name price creditsIncluded')
       .sort({ createdAt: -1 });
     
     res.json(franchises);
@@ -80,7 +82,8 @@ const getAllFranchises = async (req, res) => {
 const getFranchiseById = async (req, res) => {
   try {
     const franchise = await Franchise.findById(req.params.id)
-      .populate('userId', 'name email phone');
+      .populate('userId', 'name email phone')
+      .populate('assignedPackages', 'name price creditsIncluded');
     
     if (!franchise) {
       return res.status(404).json({ message: 'Franchise not found' });
@@ -104,15 +107,38 @@ const updateFranchise = async (req, res) => {
       });
     }
     
-    const franchise = await Franchise.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    ).populate('userId', 'name email phone');
-    
+    const franchise = await Franchise.findById(req.params.id);
     if (!franchise) {
       return res.status(404).json({ message: 'Franchise not found' });
     }
+    
+    // Check if assignedPackages are being updated
+    if (req.body.assignedPackages && Array.isArray(req.body.assignedPackages)) {
+      // Calculate credits from assigned packages
+      const packageIds = req.body.assignedPackages.filter(id => id !== null);
+      if (packageIds.length > 0) {
+        const packages = await Package.find({ _id: { $in: packageIds } });
+        let totalCredits = 0;
+        packages.forEach(pkg => {
+          totalCredits += pkg.creditsIncluded || 0;
+        });
+        
+        // Update the credits in the request body
+        req.body.credits = totalCredits;
+        // Preserve totalCreditsPurchased - it should only increase when packages are purchased, not assigned
+      } else {
+        // If no packages assigned, set credits to 0
+        req.body.credits = 0;
+      }
+    }
+    
+    // Update franchise with all fields including credits if applicable
+    Object.assign(franchise, req.body);
+    await franchise.save();
+    
+    // Populate references for response
+    await franchise.populate('userId', 'name email phone');
+    await franchise.populate('assignedPackages', 'name price creditsIncluded');
     
     res.json({
       message: 'Franchise updated successfully',

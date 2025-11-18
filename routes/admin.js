@@ -19,11 +19,23 @@ const {
   getAllCreditReportsAdmin,
   getSettings,
   updateSetting,
+  getAllFranchises,
+  getFranchiseById,
+  updateFranchise,
+  activateFranchise,
+  deactivateFranchise,
+  createFranchiseUser,
+  approveRegistration,
+  rejectRegistration,
+  deleteFranchise,
+  // Credit recharge functions
   getAllFranchisesWithCredits,
   rechargeFranchiseCredits,
   getCreditRechargeHistory,
   calculateFranchisePayouts,
   getFranchisePayouts,
+  bulkUploadLeads,
+  csvUpload,
 } = require('../controllers/adminController');
 const auth = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
@@ -59,6 +71,11 @@ router.put('/users/:id', auth, rbac('admin'), updateUser);
 // @desc    Create new lead
 // @access  Private/Admin
 router.post('/leads', auth, rbac('admin'), createLead);
+
+// @route   POST /api/admin/leads/bulk-upload
+// @desc    Bulk upload leads from CSV file
+// @access  Private/Admin
+router.post('/leads/bulk-upload', auth, rbac('admin'), csvUpload.single('csvFile'), bulkUploadLeads);
 
 // @route   GET /api/admin/leads
 // @desc    Get all leads
@@ -149,5 +166,27 @@ router.get('/settings', auth, rbac('admin'), getSettings);
 // @desc    Update setting
 // @access  Private/Admin
 router.put('/settings', auth, rbac('admin'), updateSetting);
+
+// @route   POST /api/admin/franchises
+// @desc    Create franchise user by admin
+// @access  Private/Admin
+router.post('/franchises', auth, rbac('admin'), createFranchiseUser);
+
+// @route   PUT /api/admin/franchises/:id/approve-registration
+// @desc    Approve franchise registration
+// @access  Private/Admin
+router.put('/franchises/:id/approve-registration', auth, rbac('admin'), approveRegistration);
+
+// @route   PUT /api/admin/franchises/:id/reject-registration
+// @desc    Reject franchise registration
+// @access  Private/Admin
+router.put('/franchises/:id/reject-registration', auth, rbac('admin'), rejectRegistration);
+
+// @route   DELETE /api/admin/franchises/:id
+// @desc    Delete franchise
+// @access  Private/Admin
+router.delete('/franchises/:id', auth, rbac('admin'), deleteFranchise);
+
+// Credit recharge routes
 
 module.exports = router;

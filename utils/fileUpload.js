@@ -9,11 +9,11 @@ const s3 = new aws.S3({
   region: process.env.AWS_REGION,
 });
 
-// File filter for documents
+// File filter for documents - allow images, PDFs, and CSV files
 const fileFilter = (req, file, cb) => {
-  // Accept images only
-  if (!file.originalname.match(/\.(jpg|jpeg|png|pdf)$/)) {
-    return cb(new Error('Only image and PDF files are allowed!'), false);
+  // Accept images, PDFs, and CSV files
+  if (!file.originalname.match(/\.(jpg|jpeg|png|pdf|csv)$/)) {
+    return cb(new Error('Only image, PDF, and CSV files are allowed!'), false);
   }
   cb(null, true);
 };

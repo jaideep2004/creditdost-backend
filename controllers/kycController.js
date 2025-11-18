@@ -4,25 +4,32 @@ const User = require('../models/User');
 const Setting = require('../models/Setting');
 const Joi = require('joi');
 const axios = require('axios');
-const { sendKycApprovalEmail, sendKycRejectionEmail } = require('../utils/emailService');
+const { sendKycApprovalEmail, sendKycRejectionEmail, sendRegistrationApprovalEmail } = require('../utils/emailService');
 // Import the helper function from creditController
 const { getSurepassApiKeyValue } = require('./creditController');
 
 // Validation schema for KYC submission
 const kycSchema = Joi.object({
-  aadhaarNumber: Joi.string().pattern(/^[0-9]{12}$/).required(),
-  panNumber: Joi.string().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).required(),
+  aadhaarNumber: Joi.string().pattern(/^[0-9]{12}$/).required().messages({
+    'string.pattern.base': 'Aadhaar number must be exactly 12 digits',
+    'any.required': 'Aadhaar number is required'
+  }),
+  panNumber: Joi.string().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).required().messages({
+    'string.pattern.base': 'PAN number must be in the format ABCDE1234F',
+    'any.required': 'PAN number is required'
+  }),
 });
 
 // Submit KYC documents
 const submitKyc = async (req, res) => {
   try {
     // Validate request body
-    const { error } = kycSchema.validate(req.body);
+    const { error } = kycSchema.validate(req.body, { abortEarly: false });
     if (error) {
+      console.log('KYC Validation Error:', error.details);
       return res.status(400).json({
         message: 'Validation error',
-        details: error.details[0].message
+        details: error.details.map(detail => detail.message)
       });
     }
     
@@ -38,28 +45,38 @@ const submitKyc = async (req, res) => {
       return res.status(400).json({ message: 'KYC already submitted' });
     }
     
-    // Check if files were uploaded
-    if (!req.files) {
+    // For DigiLocker submissions, files may not be uploaded
+    // Check if this is a DigiLocker submission by checking if files were uploaded
+    const isDigiLockerSubmission = !req.files || Object.keys(req.files).length === 0;
+    
+    // For non-DigiLocker submissions, check if files were uploaded
+    if (!isDigiLockerSubmission && !req.files) {
       return res.status(400).json({ message: 'No files uploaded' });
     }
     
-    // Construct file URLs
+    // Log submission type for debugging
+    console.log('KYC Submission Type:', isDigiLockerSubmission ? 'DigiLocker' : 'Manual Upload');
+    console.log('User ID:', req.user.id);
+    console.log('Franchise ID:', franchise._id);
+    console.log('Request Body:', req.body);
+    
+    // Construct file URLs (only for manual uploads)
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const fileUrls = {};
     
-    if (req.files['aadhaarFrontDocument'] && req.files['aadhaarFrontDocument'][0]) {
+    if (!isDigiLockerSubmission && req.files['aadhaarFrontDocument'] && req.files['aadhaarFrontDocument'][0]) {
       fileUrls.aadhaarFrontDocument = `${baseUrl}/uploads/${req.files['aadhaarFrontDocument'][0].filename}`;
     }
     
-    if (req.files['aadhaarBackDocument'] && req.files['aadhaarBackDocument'][0]) {
+    if (!isDigiLockerSubmission && req.files['aadhaarBackDocument'] && req.files['aadhaarBackDocument'][0]) {
       fileUrls.aadhaarBackDocument = `${baseUrl}/uploads/${req.files['aadhaarBackDocument'][0].filename}`;
     }
     
-    if (req.files['panDocument'] && req.files['panDocument'][0]) {
+    if (!isDigiLockerSubmission && req.files['panDocument'] && req.files['panDocument'][0]) {
       fileUrls.panDocument = `${baseUrl}/uploads/${req.files['panDocument'][0].filename}`;
     }
     
-    if (req.files['businessRegistrationDocument'] && req.files['businessRegistrationDocument'][0]) {
+    if (!isDigiLockerSubmission && req.files['businessRegistrationDocument'] && req.files['businessRegistrationDocument'][0]) {
       fileUrls.businessRegistrationDocument = `${baseUrl}/uploads/${req.files['businessRegistrationDocument'][0].filename}`;
     }
     
@@ -72,9 +89,16 @@ const submitKyc = async (req, res) => {
       ...fileUrls
     };
     
+    // Add a note that this is a DigiLocker submission
+    if (isDigiLockerSubmission) {
+      kycData.isDigiLockerSubmission = true;
+      kycData.submissionMethod = 'digilocker';
+    }
+    
     let kycRequest;
     if (existingKyc) {
       // Update existing rejected KYC
+      console.log('Updating existing KYC request:', existingKyc._id);
       kycRequest = await KycRequest.findByIdAndUpdate(
         existingKyc._id,
         kycData,
@@ -82,6 +106,7 @@ const submitKyc = async (req, res) => {
       );
     } else {
       // Create new KYC request
+      console.log('Creating new KYC request');
       kycRequest = new KycRequest(kycData);
       await kycRequest.save();
     }
@@ -91,11 +116,16 @@ const submitKyc = async (req, res) => {
     franchise.kycSubmittedAt = new Date();
     await franchise.save();
     
+    console.log('KYC request saved successfully:', kycRequest._id);
+    
     res.status(201).json({
-      message: 'KYC submitted successfully',
+      message: isDigiLockerSubmission 
+        ? 'KYC submitted successfully via DigiLocker! Awaiting approval.' 
+        : 'KYC documents submitted successfully! Awaiting approval.',
       kycRequest,
     });
   } catch (error) {
+    console.error('KYC submission error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -179,11 +209,20 @@ const approveKyc = async (req, res) => {
       franchise.kycApprovedAt = new Date();
       await franchise.save();
       
-      // Send approval email to franchise user
+      // Activate the user account
       const user = await User.findById(franchise.userId);
       if (user) {
+        user.isActive = true;
+        await user.save();
+        
+        // Send approval email to franchise user with login credentials
         try {
-          await sendKycApprovalEmail(user, franchise);
+          // Generate a temporary password for first-time activation
+          const tempPassword = Math.random().toString(36).slice(-8);
+          user.password = tempPassword;
+          await user.save();
+          
+          await sendKycApprovalEmail(user, franchise, tempPassword);
         } catch (emailError) {
           console.error('Failed to send KYC approval email:', emailError);
         }
@@ -226,9 +265,13 @@ const rejectKyc = async (req, res) => {
       franchise.kycRejectedReason = rejectionReason;
       await franchise.save();
       
-      // Send rejection email to franchise user
+      // Deactivate the user account
       const user = await User.findById(franchise.userId);
       if (user) {
+        user.isActive = false;
+        await user.save();
+        
+        // Send rejection email to franchise user
         try {
           await sendKycRejectionEmail(user, franchise, rejectionReason);
         } catch (emailError) {
@@ -255,7 +298,7 @@ const initializeDigiLocker = async (req, res) => {
       return res.status(404).json({ message: 'Franchise not found' });
     }
 
-    // Get Surepass API key (same as used for credit checks)
+    // Get Surepass API key (same as used for credit checks) 
     const apiKey = await getSurepassApiKeyValue();
     
     // Add debugging information

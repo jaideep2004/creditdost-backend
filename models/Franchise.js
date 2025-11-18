@@ -72,6 +72,11 @@ const franchiseSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  // Field to track assigned packages
+  assignedPackages: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Package'
+  }],
 }, {
   timestamps: true,
 });

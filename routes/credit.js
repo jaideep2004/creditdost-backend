@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   checkCreditScore,
+  checkCreditScorePublic, // Add the new public function
   getCreditReports,
   getAllCreditReports,
   getCreditReportById,
@@ -16,6 +17,11 @@ const router = express.Router();
 // @desc    Check credit score
 // @access  Private/Franchise User
 router.post('/check', auth, rbac('franchise_user'), checkCreditScore);
+
+// @route   POST /api/credit/check-public
+// @desc    Check credit score (public endpoint for Experian only)
+// @access  Public
+router.post('/check-public', checkCreditScorePublic);
 
 // @route   GET /api/credit/reports
 // @desc    Get credit reports for franchise

@@ -7,14 +7,14 @@ dotenv.config();
 
 // Connect to database
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/franchise_management', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+  useNewUrlParser: true, 
+  useUnifiedTopology: true, 
 });
 
 const checkUsers = async () => {
   try {
     const users = await User.find({});
-    console.log('Users in database:');
+    console.log('Users in database:'); 
     users.forEach(user => {
       console.log(`- ${user.name} (${user.email}) - Role: ${user.role} - Active: ${user.isActive}`);
     });

@@ -47,6 +47,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  relationshipManager: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'RelationshipManager',
+  },
 }, {
   timestamps: true,
 });

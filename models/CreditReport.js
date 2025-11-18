@@ -8,7 +8,7 @@ const creditReportSchema = new mongoose.Schema({
   franchiseId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Franchise',
-    required: true,
+    required: false, // Make optional for public reports
   },
   leadId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -55,6 +55,10 @@ const creditReportSchema = new mongoose.Schema({
   },
   localPath: {
     type: String,
+  },
+  isPublic: {
+    type: Boolean,
+    default: false,
   },
 }, {
   timestamps: true,

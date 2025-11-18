@@ -8,7 +8,36 @@ const Referral = require('../models/Referral');
 const CreditReport = require('../models/CreditReport');
 const Setting = require('../models/Setting');
 const BusinessForm = require('../models/BusinessForm');
-const { sendLeadAssignmentEmail } = require('../utils/emailService');
+const KycRequest = require('../models/KycRequest');
+const { sendLeadAssignmentEmail, sendAccountCredentialsEmail, sendAdminNotificationEmail, sendRegistrationApprovalEmail, sendRegistrationRejectionEmail } = require('../utils/emailService');
+const csv = require('csv-parser');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+const bcrypt = require('bcryptjs');
+
+// Configure CSV file upload
+const csvUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+      cb(null, 'leads-' + Date.now() + '.csv');
+    }
+  }),
+  fileFilter: (req, file, cb) => {
+    // Accept only CSV files
+    if (file.mimetype === 'text/csv' || file.originalname.match(/\.csv$/)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed!'), false);
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+});
 
 // Get dashboard statistics
 const getDashboardStats = async (req, res) => {
@@ -286,6 +315,95 @@ const updateLead = async (req, res) => {
   }
 };
 
+// Bulk upload leads from CSV file (admin only)
+const bulkUploadLeads = async (req, res) => {
+  try {
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ 
+        message: 'No CSV file uploaded' 
+      });
+    }
+
+    const results = [];
+    const filePath = req.file.path;
+    
+    // Parse CSV file
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(filePath)
+        .pipe(csv())
+        .on('data', (data) => results.push(data))
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    // Validate and process leads
+    const createdLeads = [];
+    const errors = [];
+    
+    for (const [index, row] of results.entries()) {
+      try {
+        // Validate required fields
+        if (!row.name || !row.phone) {
+          errors.push(`Row ${index + 1}: Name and phone are required`);
+          continue;
+        }
+        
+        // Create lead object
+        const leadData = {
+          name: row.name,
+          email: row.email ? row.email.toLowerCase() : undefined,
+          phone: row.phone,
+          address: {
+            street: row.address || undefined,
+            city: row.city || undefined,
+            state: row.state || undefined,
+            pincode: row.pincode || undefined
+          },
+          creditScore: row.creditScore ? parseInt(row.creditScore) : undefined,
+          creditReportUrl: row.creditReportUrl || undefined,
+          status: 'new' // Default status
+        };
+        
+        // Create lead in database
+        const lead = new Lead(leadData);
+        await lead.save();
+        
+        // Populate references
+        await lead.populate('franchiseId', 'businessName');
+        await lead.populate('assignedTo', 'name');
+        
+        createdLeads.push(lead);
+      } catch (error) {
+        errors.push(`Row ${index + 1}: ${error.message}`);
+      }
+    }
+    
+    // Delete the uploaded file
+    fs.unlinkSync(filePath);
+    
+    // Return response
+    res.json({
+      message: `${createdLeads.length} leads uploaded successfully`,
+      createdLeads,
+      errors,
+      totalProcessed: results.length,
+      successCount: createdLeads.length,
+      errorCount: errors.length
+    });
+  } catch (error) {
+    // Delete the uploaded file if it exists
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ 
+      message: 'Server error during bulk upload', 
+      error: error.message 
+    });
+  }
+};
+
 // Get all transactions (admin only)
 const getAllTransactions = async (req, res) => {
   try {
@@ -497,6 +615,101 @@ const getAllFranchisesWithCredits = async (req, res) => {
   }
 };
 
+// Create franchise user by admin (admin only)
+const createFranchiseUser = async (req, res) => {
+  try {
+    const { name, email, phone, state, pincode, language, businessName, ownerName, assignedPackages } = req.body;
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
+    
+    // Generate a random password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    
+    // Create user
+    const user = new User({
+      name,
+      email,
+      phone,
+      state,
+      pincode,
+      language,
+      password: tempPassword,
+      role: 'franchise_user',
+      isActive: true // Activate user immediately when created by admin
+    });
+    
+    await user.save();
+    
+    // Create franchise record
+    const franchiseData = {
+      userId: user._id,
+      businessName: businessName || name,
+      ownerName: ownerName || name,
+      email,
+      phone,
+      kycStatus: 'approved', // Auto-approve KYC for admin-created users
+      kycApprovedAt: new Date(),
+      agreementSigned: true,
+      agreementSignedAt: new Date(),
+      isActive: true
+    };
+    
+    // Add assigned packages and credits if provided
+    if (assignedPackages && Array.isArray(assignedPackages) && assignedPackages.length > 0) {
+      franchiseData.assignedPackages = assignedPackages;
+      
+      // Add credits from assigned packages
+      const packages = await Package.find({ _id: { $in: assignedPackages } });
+      let totalCredits = 0;
+      packages.forEach(pkg => {
+        totalCredits += pkg.creditsIncluded || 0;
+      });
+      
+      // Set initial credits
+      franchiseData.credits = totalCredits;
+      franchiseData.totalCreditsPurchased = totalCredits;
+    }
+    
+    const franchise = new Franchise(franchiseData);
+    
+    await franchise.save();
+    
+    // Send account credentials email to user
+    try {
+      await sendRegistrationApprovalEmail(user, franchise, tempPassword);
+    } catch (emailError) {
+      console.error('Failed to send credentials email to user:', emailError);
+      // Don't fail the creation if email sending fails
+    }
+    
+    // Send notification email to admin
+    try {
+      await sendAdminNotificationEmail(user);
+    } catch (emailError) {
+      console.error('Failed to send admin notification email:', emailError);
+      // Don't fail the creation if email sending fails
+    }
+    
+    res.status(201).json({
+      message: 'Franchise user created successfully. Login credentials sent to user email.',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      franchise
+    });
+  } catch (error) {
+    console.error('Create franchise user error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // Recharge credits for a franchise (admin only)
 const rechargeFranchiseCredits = async (req, res) => {
   try {
@@ -597,11 +810,17 @@ const calculateFranchisePayouts = async (req, res) => {
       });
     }
     
-    // Find the franchise
-    const franchise = await Franchise.findById(franchiseId);
+    // Find the franchise and populate assigned packages
+    const franchise = await Franchise.findById(franchiseId).populate('assignedPackages', 'name businessPayoutType businessPayoutPercentage businessPayoutFixedAmount');
     if (!franchise) {
       return res.status(404).json({ message: 'Franchise not found' });
     }
+    
+    // Get the franchise's assigned package for payout calculation
+    // For now, we'll use the first assigned package if multiple are assigned
+    const franchisePackage = franchise.assignedPackages && franchise.assignedPackages.length > 0 
+      ? franchise.assignedPackages[0] 
+      : null;
     
     // Get business forms (customer packages sold) during the period
     const businessForms = await BusinessForm.find({
@@ -611,7 +830,10 @@ const calculateFranchisePayouts = async (req, res) => {
         $gte: startDate,
         $lte: endDate
       }
-    }).populate('selectedPackage');
+    }).populate('selectedPackage', 'name price creditsIncluded businessPayoutType businessPayoutPercentage businessPayoutFixedAmount');
+    
+    console.log('Found business forms:', businessForms.length);
+    console.log('Business forms data:', JSON.stringify(businessForms, null, 2));
     
     // Calculate business payout based on customer packages sold
     let totalBusinessPayout = 0;
@@ -619,15 +841,41 @@ const calculateFranchisePayouts = async (req, res) => {
     
     for (const form of businessForms) {
       if (form.selectedPackage) {
+        console.log('Processing form:', form._id);
+        console.log('Selected package:', JSON.stringify(form.selectedPackage, null, 2));
+        
         creditsGenerated += form.selectedPackage.creditsIncluded || 0;
         
-        // Calculate business payout based on customer package settings
-        const customerPackage = form.selectedPackage;
-        if (customerPackage.businessPayoutType === 'percentage') {
-          totalBusinessPayout += (customerPackage.price * (customerPackage.businessPayoutPercentage || 20)) / 100;
+        // Calculate business payout based on the franchise's assigned package settings
+        // The franchise's package determines their commission rate
+        let payoutAmount = 0;
+        
+        // Use the franchise's package payout settings
+        if (franchisePackage) {
+          if (franchisePackage.businessPayoutType === 'percentage') {
+            const payoutPercentage = franchisePackage.businessPayoutPercentage !== undefined ? 
+              franchisePackage.businessPayoutPercentage : 20;
+            payoutAmount = (form.selectedPackage.price * payoutPercentage) / 100;
+            console.log(`Calculating percentage payout using franchise package ${franchisePackage.name}: ${form.selectedPackage.price} * ${payoutPercentage}% = ${payoutAmount}`);
+          } else {
+            payoutAmount = franchisePackage.businessPayoutFixedAmount || 0;
+            console.log(`Using fixed payout from franchise package ${franchisePackage.name}: ${payoutAmount}`);
+          }
         } else {
-          totalBusinessPayout += customerPackage.businessPayoutFixedAmount || 0;
+          // Fallback to customer package settings if no franchise package is assigned
+          if (form.selectedPackage.businessPayoutType === 'percentage') {
+            const payoutPercentage = form.selectedPackage.businessPayoutPercentage !== undefined ? 
+              form.selectedPackage.businessPayoutPercentage : 20;
+            payoutAmount = (form.selectedPackage.price * payoutPercentage) / 100;
+            console.log(`Calculating percentage payout using customer package ${form.selectedPackage.name}: ${form.selectedPackage.price} * ${payoutPercentage}% = ${payoutAmount}`);
+          } else {
+            payoutAmount = form.selectedPackage.businessPayoutFixedAmount || 0;
+            console.log(`Using fixed payout from customer package ${form.selectedPackage.name}: ${payoutAmount}`);
+          }
         }
+        
+        totalBusinessPayout += payoutAmount;
+        console.log(`Added payout for form ${form._id}: ${payoutAmount}, Total so far: ${totalBusinessPayout}`);
       }
     }
     
@@ -662,6 +910,12 @@ const calculateFranchisePayouts = async (req, res) => {
     // Package business payout + referral bonuses
     const totalAmount = totalBusinessPayout + referralBonus;
     
+    // Calculate TDS (2% of total amount)
+    const tdsAmount = totalAmount * 0.02;
+    
+    // Calculate final payout amount after TDS deduction
+    const finalPayoutAmount = totalAmount - tdsAmount;
+    
     // Create payout record
     const payout = new Payout({
       franchiseId: franchiseId,
@@ -670,7 +924,10 @@ const calculateFranchisePayouts = async (req, res) => {
       periodEnd: endDate,
       creditsGenerated: creditsGenerated,
       referralBonus: referralBonus,
-      totalAmount: totalAmount,
+      totalAmount: finalPayoutAmount,
+      grossAmount: totalAmount,
+      tdsAmount: tdsAmount,
+      tdsPercentage: 2,
       status: 'pending'
     });
     
@@ -681,7 +938,10 @@ const calculateFranchisePayouts = async (req, res) => {
     
     res.json({
       message: 'Payout calculated successfully',
-      payout
+      payout,
+      tdsDeducted: tdsAmount,
+      grossAmount: totalAmount,
+      netAmount: finalPayoutAmount
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -699,6 +959,167 @@ const getFranchisePayouts = async (req, res) => {
       .sort({ createdAt: -1 });
     
     res.json(payouts);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Approve franchise registration (admin only)
+const approveRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assignedPackages } = req.body; // Get assigned packages from request body
+    
+    // Find franchise
+    const franchise = await Franchise.findById(id);
+    if (!franchise) {
+      return res.status(404).json({ message: 'Franchise not found' });
+    }
+    
+    // Find user
+    const user = await User.findById(franchise.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Activate user and franchise
+    user.isActive = true;
+    franchise.isActive = true;
+    
+    // Assign packages and add credits if provided
+    if (assignedPackages && Array.isArray(assignedPackages) && assignedPackages.length > 0) {
+      franchise.assignedPackages = assignedPackages;
+      
+      // Add credits from assigned packages
+      const packages = await Package.find({ _id: { $in: assignedPackages } });
+      let totalCredits = 0;
+      packages.forEach(pkg => {
+        totalCredits += pkg.creditsIncluded || 0;
+      });
+      
+      // Add credits to franchise
+      franchise.credits += totalCredits;
+      franchise.totalCreditsPurchased += totalCredits;
+    }
+    
+    await user.save();
+    await franchise.save();
+    
+    // Generate a temporary password for first-time activation
+    const tempPassword = Math.random().toString(36).slice(-8);
+    user.password = tempPassword;
+    await user.save();
+    
+    // Send approval email to franchise user with login credentials
+    try {
+      await sendRegistrationApprovalEmail(user, franchise, tempPassword);
+    } catch (emailError) {
+      console.error('Failed to send registration approval email:', emailError);
+      // Don't fail the approval if email sending fails
+    }
+    
+    res.json({
+      message: 'Registration approved successfully',
+      franchise,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Reject franchise registration (admin only)
+const rejectRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rejectionReason } = req.body;
+    
+    // Find franchise
+    const franchise = await Franchise.findById(id);
+    if (!franchise) {
+      return res.status(404).json({ message: 'Franchise not found' });
+    }
+    
+    // Find user
+    const user = await User.findById(franchise.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Deactivate user and franchise
+    user.isActive = false;
+    franchise.isActive = false;
+    await user.save();
+    await franchise.save();
+    
+    // Send rejection email to franchise user
+    try {
+      await sendRegistrationRejectionEmail(user, franchise, rejectionReason);
+    } catch (emailError) {
+      console.error('Failed to send registration rejection email:', emailError);
+      // Don't fail the rejection if email sending fails
+    }
+    
+    res.json({
+      message: 'Registration rejected successfully',
+      franchise,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Delete franchise (admin only)
+const deleteFranchise = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find franchise
+    const franchise = await Franchise.findById(id);
+    if (!franchise) {
+      return res.status(404).json({ message: 'Franchise not found' });
+    }
+    
+    // Find user
+    const user = await User.findById(franchise.userId);
+    
+    // Delete all related data
+    // Delete KYC requests
+    await KycRequest.deleteMany({ franchiseId: id });
+    
+    // Delete leads
+    await Lead.deleteMany({ franchiseId: id });
+    
+    // Delete credit reports
+    await CreditReport.deleteMany({ franchiseId: id });
+    
+    // Delete business forms
+    await BusinessForm.deleteMany({ franchiseId: id });
+    
+    // Delete transactions
+    await Transaction.deleteMany({ userId: franchise.userId });
+    
+    // Delete payouts
+    await Payout.deleteMany({ franchiseId: id });
+    
+    // Delete referrals
+    await Referral.deleteMany({ 
+      $or: [
+        { referrerFranchiseId: id },
+        { referredFranchiseId: id }
+      ]
+    });
+    
+    // Delete the franchise
+    await Franchise.findByIdAndDelete(id);
+    
+    // Delete the user if exists
+    if (user) {
+      await User.findByIdAndDelete(user._id);
+    }
+    
+    res.json({
+      message: 'Franchise deleted successfully',
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -729,4 +1150,10 @@ module.exports = {
   getCreditRechargeHistory,
   calculateFranchisePayouts,
   getFranchisePayouts,
+  bulkUploadLeads,
+  csvUpload,
+  createFranchiseUser,
+  approveRegistration,
+  rejectRegistration,
+  deleteFranchise,
 };
