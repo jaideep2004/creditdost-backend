@@ -618,7 +618,14 @@ const getAllFranchisesWithCredits = async (req, res) => {
 // Create franchise user by admin (admin only)
 const createFranchiseUser = async (req, res) => {
   try {
-    const { name, email, phone, state, pincode, language, businessName, ownerName, assignedPackages } = req.body;
+    // Extract only the fields we're now accepting
+    const { name, email, assignedPackages } = req.body;
+    
+    // Set default values for required fields that are no longer provided in the form
+    const phone = '0000000000';  // Placeholder phone number
+    const state = 'Not Provided';  // Placeholder state
+    const pincode = '000000';  // Placeholder pincode
+    const language = 'en';  // Default language
     
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -629,7 +636,7 @@ const createFranchiseUser = async (req, res) => {
     // Generate a random password
     const tempPassword = Math.random().toString(36).slice(-8);
     
-    // Create user
+    // Create user with placeholder/default values for required fields
     const user = new User({
       name,
       email,
@@ -647,12 +654,12 @@ const createFranchiseUser = async (req, res) => {
     // Create franchise record
     const franchiseData = {
       userId: user._id,
-      businessName: businessName || name,
-      ownerName: ownerName || name,
+      businessName: name,
+      ownerName: name,
       email,
       phone,
-      kycStatus: 'approved', // Auto-approve KYC for admin-created users
-      kycApprovedAt: new Date(),
+      // Keep KYC status as pending - only registration is approved, not KYC
+      kycStatus: 'pending',
       agreementSigned: true,
       agreementSignedAt: new Date(),
       isActive: true
@@ -1125,6 +1132,36 @@ const deleteFranchise = async (req, res) => {
   }
 };
 
+// Update franchise certificate name (admin only)
+const updateFranchiseCertificateName = async (req, res) => {
+  try {
+    const { franchiseId, certificateName } = req.body;
+    
+    // Validate input
+    if (!franchiseId || !certificateName || certificateName.trim().length === 0) {
+      return res.status(400).json({ message: 'Franchise ID and certificate name are required' });
+    }
+    
+    // Find and update franchise
+    const franchise = await Franchise.findByIdAndUpdate(
+      franchiseId,
+      { certificateName: certificateName.trim() },
+      { new: true }
+    );
+    
+    if (!franchise) {
+      return res.status(404).json({ message: 'Franchise not found' });
+    }
+    
+    res.json({
+      message: 'Certificate name updated successfully',
+      franchise
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getRecentActivities,
@@ -1156,4 +1193,5 @@ module.exports = {
   approveRegistration,
   rejectRegistration,
   deleteFranchise,
+  updateFranchiseCertificateName,
 };

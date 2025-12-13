@@ -77,6 +77,31 @@ const franchiseSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Package'
   }],
+  // Custom certificate name for display on certificate
+  certificateName: {
+    type: String,
+    trim: true,
+  },
+  // PAN details
+  panNumber: {
+    type: String,
+    trim: true,
+  },
+  panDetails: {
+    type: mongoose.Schema.Types.Mixed, // Store full PAN comprehensive response
+  },
+  // Bank details
+  bankAccountNumber: {
+    type: String,
+    trim: true,
+  },
+  bankIfscCode: {
+    type: String,
+    trim: true,
+  },
+  bankDetails: {
+    type: mongoose.Schema.Types.Mixed, // Store full bank verification response
+  },
 }, {
   timestamps: true,
 });

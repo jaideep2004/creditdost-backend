@@ -7,6 +7,14 @@ const {
   updateFranchise,
   deactivateFranchise,
   activateFranchise,
+  generateCertificate,
+  requestCertificateNameUpdate,
+  getPanDetails,
+  updatePanDetails,
+  fetchPanComprehensive,
+  getBankDetails,
+  updateBankDetails,
+  fetchBankVerification,
 } = require('../controllers/franchiseController');
 const auth = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
@@ -22,6 +30,46 @@ router.get('/profile', auth, rbac('franchise_user'), getFranchiseProfile);
 // @desc    Update franchise profile
 // @access  Private/Franchise User
 router.put('/profile', auth, rbac('franchise_user'), updateFranchiseProfile);
+
+// @route   GET /api/franchises/certificate
+// @desc    Generate certificate data
+// @access  Private/Franchise User
+router.get('/certificate', auth, rbac('franchise_user'), generateCertificate);
+
+// @route   PUT /api/franchises/certificate/name
+// @desc    Request certificate name update
+// @access  Private/Franchise User
+router.put('/certificate/name', auth, rbac('franchise_user'), requestCertificateNameUpdate);
+
+// @route   GET /api/franchises/pan
+// @desc    Get PAN details
+// @access  Private/Franchise User
+router.get('/pan', auth, rbac('franchise_user'), getPanDetails);
+
+// @route   PUT /api/franchises/pan
+// @desc    Update PAN number
+// @access  Private/Franchise User
+router.put('/pan', auth, rbac('franchise_user'), updatePanDetails);
+
+// @route   POST /api/franchises/pan/fetch
+// @desc    Fetch PAN comprehensive details from Surepass
+// @access  Private/Franchise User
+router.post('/pan/fetch', auth, rbac('franchise_user'), fetchPanComprehensive);
+
+// @route   GET /api/franchises/bank
+// @desc    Get bank details
+// @access  Private/Franchise User
+router.get('/bank', auth, rbac('franchise_user'), getBankDetails);
+
+// @route   PUT /api/franchises/bank
+// @desc    Update bank details
+// @access  Private/Franchise User
+router.put('/bank', auth, rbac('franchise_user'), updateBankDetails);
+
+// @route   POST /api/franchises/bank/verify
+// @desc    Verify bank details with Surepass
+// @access  Private/Franchise User
+router.post('/bank/verify', auth, rbac('franchise_user'), fetchBankVerification);
 
 // @route   GET /api/franchises
 // @desc    Get all franchises

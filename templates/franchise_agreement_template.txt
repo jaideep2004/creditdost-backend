@@ -1,0 +1,17 @@
+FRANCHISE AGREEMENT TEMPLATE
+
+This is a placeholder for the franchise agreement template PDF.
+
+In a real implementation, this would be a professionally designed PDF document with:
+- Company letterhead
+- Legal terms and conditions
+- Franchise details
+- Signature blocks
+- Date fields
+
+The system will automatically insert the franchisee's name at a designated position in the document when generating the personalized agreement.
+
+For implementation:
+1. Replace this text file with an actual PDF template
+2. Update the coordinates in the generatePdfWithUserData function in digitalAgreementController.js to match where the name should appear
+3. Ensure the PDF has appropriate form fields or spaces for signatures

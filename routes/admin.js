@@ -28,6 +28,7 @@ const {
   approveRegistration,
   rejectRegistration,
   deleteFranchise,
+  updateFranchiseCertificateName,
   // Credit recharge functions
   getAllFranchisesWithCredits,
   rechargeFranchiseCredits,
@@ -186,6 +187,11 @@ router.put('/franchises/:id/reject-registration', auth, rbac('admin'), rejectReg
 // @desc    Delete franchise
 // @access  Private/Admin
 router.delete('/franchises/:id', auth, rbac('admin'), deleteFranchise);
+
+// @route   PUT /api/admin/franchises/certificate-name
+// @desc    Update franchise certificate name
+// @access  Private/Admin
+router.put('/franchises/certificate-name', auth, rbac('admin'), updateFranchiseCertificateName);
 
 // Credit recharge routes
 

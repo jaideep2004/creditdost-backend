@@ -18,6 +18,18 @@ const kycSchema = Joi.object({
     'string.pattern.base': 'PAN number must be in the format ABCDE1234F',
     'any.required': 'PAN number is required'
   }),
+  aadhaarFrontDocument: Joi.string().uri().optional().allow('').messages({
+    'string.uri': 'Aadhaar front document must be a valid URL'
+  }),
+  aadhaarBackDocument: Joi.string().uri().optional().allow('').messages({
+    'string.uri': 'Aadhaar back document must be a valid URL'
+  }),
+  panDocument: Joi.string().uri().optional().allow('').messages({
+    'string.uri': 'PAN document must be a valid URL'
+  }),
+  businessRegistrationDocument: Joi.string().uri().optional().allow('').messages({
+    'string.uri': 'Business registration document must be a valid URL'
+  }),
 });
 
 // Submit KYC documents
@@ -45,39 +57,57 @@ const submitKyc = async (req, res) => {
       return res.status(400).json({ message: 'KYC already submitted' });
     }
     
-    // For DigiLocker submissions, files may not be uploaded
-    // Check if this is a DigiLocker submission by checking if files were uploaded
-    const isDigiLockerSubmission = !req.files || Object.keys(req.files).length === 0;
+    // Check if this is a manual submission with Google Drive links
+    const hasLinks = req.body.aadhaarFrontDocument || req.body.aadhaarBackDocument || 
+                     req.body.panDocument || req.body.businessRegistrationDocument;
     
-    // For non-DigiLocker submissions, check if files were uploaded
-    if (!isDigiLockerSubmission && !req.files) {
-      return res.status(400).json({ message: 'No files uploaded' });
-    }
+    // For manual submissions with links, check if files were uploaded
+    const hasFiles = req.files && Object.keys(req.files).length > 0;
     
     // Log submission type for debugging
-    console.log('KYC Submission Type:', isDigiLockerSubmission ? 'DigiLocker' : 'Manual Upload');
+    console.log('KYC Submission Type:', hasLinks ? 'Manual with Links' : (hasFiles ? 'Manual Upload' : 'Incomplete'));
     console.log('User ID:', req.user.id);
     console.log('Franchise ID:', franchise._id);
     console.log('Request Body:', req.body);
     
     // Construct file URLs (only for manual uploads)
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
     const fileUrls = {};
     
-    if (!isDigiLockerSubmission && req.files['aadhaarFrontDocument'] && req.files['aadhaarFrontDocument'][0]) {
-      fileUrls.aadhaarFrontDocument = `${baseUrl}/uploads/${req.files['aadhaarFrontDocument'][0].filename}`;
-    }
-    
-    if (!isDigiLockerSubmission && req.files['aadhaarBackDocument'] && req.files['aadhaarBackDocument'][0]) {
-      fileUrls.aadhaarBackDocument = `${baseUrl}/uploads/${req.files['aadhaarBackDocument'][0].filename}`;
-    }
-    
-    if (!isDigiLockerSubmission && req.files['panDocument'] && req.files['panDocument'][0]) {
-      fileUrls.panDocument = `${baseUrl}/uploads/${req.files['panDocument'][0].filename}`;
-    }
-    
-    if (!isDigiLockerSubmission && req.files['businessRegistrationDocument'] && req.files['businessRegistrationDocument'][0]) {
-      fileUrls.businessRegistrationDocument = `${baseUrl}/uploads/${req.files['businessRegistrationDocument'][0].filename}`;
+    if (hasFiles) {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      if (req.files['aadhaarFrontDocument'] && req.files['aadhaarFrontDocument'][0]) {
+        fileUrls.aadhaarFrontDocument = `${baseUrl}/uploads/${req.files['aadhaarFrontDocument'][0].filename}`;
+      }
+      
+      if (req.files['aadhaarBackDocument'] && req.files['aadhaarBackDocument'][0]) {
+        fileUrls.aadhaarBackDocument = `${baseUrl}/uploads/${req.files['aadhaarBackDocument'][0].filename}`;
+      }
+      
+      if (req.files['panDocument'] && req.files['panDocument'][0]) {
+        fileUrls.panDocument = `${baseUrl}/uploads/${req.files['panDocument'][0].filename}`;
+      }
+      
+      if (req.files['businessRegistrationDocument'] && req.files['businessRegistrationDocument'][0]) {
+        fileUrls.businessRegistrationDocument = `${baseUrl}/uploads/${req.files['businessRegistrationDocument'][0].filename}`;
+      }
+    } else if (hasLinks) {
+      // For manual submissions with Google Drive links
+      if (req.body.aadhaarFrontDocument) {
+        fileUrls.aadhaarFrontDocument = req.body.aadhaarFrontDocument;
+      }
+      
+      if (req.body.aadhaarBackDocument) {
+        fileUrls.aadhaarBackDocument = req.body.aadhaarBackDocument;
+      }
+      
+      if (req.body.panDocument) {
+        fileUrls.panDocument = req.body.panDocument;
+      }
+      
+      if (req.body.businessRegistrationDocument) {
+        fileUrls.businessRegistrationDocument = req.body.businessRegistrationDocument;
+      }
     }
     
     // Create/update KYC request
@@ -89,10 +119,11 @@ const submitKyc = async (req, res) => {
       ...fileUrls
     };
     
-    // Add a note that this is a DigiLocker submission
-    if (isDigiLockerSubmission) {
-      kycData.isDigiLockerSubmission = true;
-      kycData.submissionMethod = 'digilocker';
+    // Add a note about submission method
+    if (hasLinks) {
+      kycData.submissionMethod = 'google-drive-links';
+    } else if (hasFiles) {
+      kycData.submissionMethod = 'file-upload';
     }
     
     let kycRequest;
@@ -119,9 +150,11 @@ const submitKyc = async (req, res) => {
     console.log('KYC request saved successfully:', kycRequest._id);
     
     res.status(201).json({
-      message: isDigiLockerSubmission 
-        ? 'KYC submitted successfully via DigiLocker! Awaiting approval.' 
-        : 'KYC documents submitted successfully! Awaiting approval.',
+      message: hasLinks 
+        ? 'KYC submitted successfully with Google Drive links! Awaiting approval.' 
+        : hasFiles
+        ? 'KYC documents submitted successfully! Awaiting approval.'
+        : 'KYC submitted successfully! Awaiting approval.',
       kycRequest,
     });
   } catch (error) {
@@ -215,14 +248,9 @@ const approveKyc = async (req, res) => {
         user.isActive = true;
         await user.save();
         
-        // Send approval email to franchise user with login credentials
+        // Send approval email to franchise user WITHOUT login credentials
         try {
-          // Generate a temporary password for first-time activation
-          const tempPassword = Math.random().toString(36).slice(-8);
-          user.password = tempPassword;
-          await user.save();
-          
-          await sendKycApprovalEmail(user, franchise, tempPassword);
+          await sendKycApprovalEmail(user, franchise);
         } catch (emailError) {
           console.error('Failed to send KYC approval email:', emailError);
         }

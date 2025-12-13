@@ -8,7 +8,7 @@ const kycRequestSchema = new mongoose.Schema({
   },
   franchiseId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Franchise',
+    ref: 'Franchise',   
     required: true,
   },
   aadhaarNumber: {
@@ -38,7 +38,7 @@ const kycRequestSchema = new mongoose.Schema({
   },
   submissionMethod: {
     type: String,
-    enum: ['manual', 'digilocker'],
+    enum: ['manual', 'digilocker', 'google-drive-links', 'file-upload'],
     default: 'manual',
   },
   status: {

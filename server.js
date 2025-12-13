@@ -112,6 +112,7 @@ app.use("/api/relationship-managers", require("./routes/relationshipManagers"));
 app.use("/api/emi", require("./routes/emi"));
 app.use("/api/google-sheets", require("./routes/googleSheets"));
 app.use("/api/forms", require("./routes/forms"));
+app.use("/api/digital-agreements", require("./routes/digitalAgreements"));
 
 // Error handling middleware
 app.use(require("./middleware/errorHandler"));

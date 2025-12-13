@@ -97,8 +97,8 @@ const sendRegistrationApprovalEmail = async (user, franchise, password) => {
       <p><strong>Password:</strong> ${password || 'Your previously set password'}</p>
       <p>Please log in and change your password for security.</p>
       <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>
+      <p><strong>Important:</strong> Please complete your KYC verification in the platform to unlock all features.</p>
       <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
-      <p>You can now access all the features of the CreditDost franchise platform.</p>
       <p>Best regards,<br>The CreditDost Team</p>
     `,
   };
@@ -126,7 +126,7 @@ const sendRegistrationRejectionEmail = async (user, franchise, reason) => {
 };
 
 // Send KYC approval email
-const sendKycApprovalEmail = async (user, franchise, password) => {
+const sendKycApprovalEmail = async (user, franchise) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: user.email,
@@ -135,11 +135,6 @@ const sendKycApprovalEmail = async (user, franchise, password) => {
       <h2>KYC Approved!</h2>
       <p>Hello ${user.name},</p>
       <p>Congratulations! Your KYC documents have been approved.</p>
-      ${password ? `<p>Your account credentials have been updated. Here are your login credentials:</p>
-      <p><strong>Email:</strong> ${user.email}</p>
-      <p><strong>Password:</strong> ${password}</p>
-      <p>Please log in and change your password for security.</p>
-      <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>` : ''}
       <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
       <p>You can now access all the features of the CreditDost franchise platform.</p>
       <p>Best regards,<br>The CreditDost Team</p>
@@ -182,6 +177,7 @@ const sendAccountCredentialsEmail = async (user, password) => {
       <p><strong>Password:</strong> ${password}</p>
       <p>Please log in and change your password for security.</p>
       <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>
+      <p><strong>Important:</strong> Please complete your KYC verification in the platform to unlock all features.</p>
       <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
       <p>Best regards,<br>The CreditDost Team</p>
     `,
