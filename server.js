@@ -88,12 +88,27 @@ app.use(cookieParser());
 app.use("/reports", express.static(path.join(__dirname, "reports")));
 
 // CORS configuration
-app.use(
-  cors({
-    origin: "*",
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || "http://localhost:5173",
+      "https://creditdost.onrender.com"
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));
