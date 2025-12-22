@@ -8,6 +8,9 @@ const { sendPaymentSuccessEmail, sendAccountCredentialsEmail } = require('../uti
 const bcrypt = require('bcryptjs');
 const { processReferralBonus } = require('../utils/referralUtils');
 
+// Import the digital agreement controller to update package details
+const { updateAgreementPackageDetails } = require('./digitalAgreementController');
+
 // Initialize Razorpay instance
 console.log('Initializing Razorpay with key_id:', process.env.RAZORPAY_KEY_ID);
 const razorpay = new Razorpay({
@@ -116,6 +119,17 @@ const verifyPayment = async (req, res) => {
         
         // Process referral bonus if applicable
         await processReferralBonus(franchise._id, pkg._id, pkg.price);
+        
+        // Update digital agreement with package details
+        try {
+          await updateAgreementPackageDetails(transaction.userId, {
+            price: `Rs. ${pkg.price}`,
+            name: pkg.name,
+            credits: pkg.creditsIncluded
+          });
+        } catch (agreementError) {
+          console.error('Failed to update digital agreement with package details:', agreementError);
+        }
       }
     }
     

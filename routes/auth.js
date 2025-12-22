@@ -1,5 +1,5 @@
 const express = require('express');
-const { register, login, logout, getProfile, forgotPassword } = require('../controllers/authController');
+const { register, login, logout, getProfile, forgotPassword, requestPasswordReset, resetPassword } = require('../controllers/authController');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -15,9 +15,19 @@ router.post('/register', register);
 router.post('/login', login);
 
 // @route   POST /api/auth/forgot-password
-// @desc    Request password reset
+// @desc    Request password reset (legacy)
 // @access  Public
 router.post('/forgot-password', forgotPassword);
+
+// @route   POST /api/auth/request-password-reset
+// @desc    Request password reset with token
+// @access  Public
+router.post('/request-password-reset', requestPasswordReset);
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password with token
+// @access  Public
+router.post('/reset-password', resetPassword);
 
 // @route   POST /api/auth/logout
 // @desc    Logout user

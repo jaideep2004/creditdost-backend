@@ -21,7 +21,6 @@ const transactionSchema = new mongoose.Schema({
   },
   paymentId: {
     type: String,
-    unique: true,
   },
   amount: {
     type: Number,

@@ -1,4 +1,6 @@
 const CustomerPackage = require('../models/CustomerPackage');
+const Franchise = require('../models/Franchise');
+const Transaction = require('../models/Transaction');
 const Joi = require('joi');
 
 // Validation schema for creating/updating customer packages
@@ -19,7 +21,42 @@ const customerPackageSchema = Joi.object({
 // Get all active customer packages
 const getCustomerPackages = async (req, res) => {
   try {
-    const packages = await CustomerPackage.find({ isActive: true }).sort({ sortOrder: 1 });
+    let packages = await CustomerPackage.find({ isActive: true }).sort({ sortOrder: 1 });
+    
+    // If user is authenticated as a franchise user, check if they have purchased the Diamond package
+    if (req.user && req.user.role === 'franchise_user') {
+      // Get the franchise details
+      const franchise = await Franchise.findOne({ userId: req.user.id });
+      
+      if (franchise) {
+        // Check if franchise has purchased a package by checking their transactions
+        const transactions = await Transaction.find({ 
+          userId: req.user.id,
+          status: 'paid'
+        }).populate('packageId');
+        
+        // Check if any transaction is for a package that we consider as "Diamond" package
+        // We'll check for a package with name containing 'Diamond', 'Enterprise', or price >= 9999
+        // This can be customized based on business requirements
+        const hasDiamondPackage = transactions.some(transaction => 
+          transaction.packageId && 
+          (transaction.packageId.name.includes('Diamond') || 
+           transaction.packageId.name.includes('Enterprise') ||
+           transaction.packageId.price >= 9999)
+        );
+        
+        // Log for debugging
+        console.log('Franchise ID:', franchise._id);
+        console.log('Transactions:', transactions);
+        console.log('Has Diamond Package:', hasDiamondPackage);
+        
+        // If franchise doesn't have Diamond package, filter out the Credit Fit package
+        if (!hasDiamondPackage) {
+          packages = packages.filter(pkg => pkg.name !== 'Credit Fit');
+        }
+      }
+    }
+    
     res.json(packages);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

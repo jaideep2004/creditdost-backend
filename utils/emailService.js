@@ -42,12 +42,12 @@ const sendRegistrationEmail = async (user) => {
 };
 
 // Send registration notification email to admin
-const sendAdminNotificationEmail = async (user) => {
+const sendAdminNotificationEmail = async (user, options = {}) => {
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Fallback to EMAIL_USER if ADMIN_EMAIL not set
-    subject: 'New Franchise Registration - CreditDost Platform',
-    html: `
+    subject: options.subject || 'New Franchise Registration - CreditDost Platform',
+    html: options.html || `
       <h2>New Franchise Registration</h2>
       <p>A new franchise user has registered on the CreditDost platform.</p>
       <p><strong>Name:</strong> ${user.name}</p>
@@ -417,7 +417,116 @@ const sendFranchiseOpportunityEmail = async (franchiseOpportunity) => {
   return transporter.sendMail(mailOptions);
 };
 
+// Send job application email
+const sendJobApplicationEmail = async (applicationData, resumeBuffer) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: process.env.JOB_APPLICATION_EMAIL || process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
+    subject: `Job Application: ${applicationData.position} - ${applicationData.name}`,
+    html: `
+      <h2>New Job Application</h2>
+      <p>A new job application has been submitted with the following details:</p>
+      <p><strong>Position Applied For:</strong> ${applicationData.position}</p>
+      <p><strong>Name:</strong> ${applicationData.name}</p>
+      <p><strong>Email:</strong> ${applicationData.email}</p>
+      <p><strong>Phone:</strong> ${applicationData.phone}</p>
+      <p>Please find the attached resume for review.</p>
+      <p>Best regards,<br>The CreditDost System</p>
+    `,
+    attachments: [
+      {
+        filename: `resume_${applicationData.name.replace(/\s+/g, '_')}_${Date.now()}.${applicationData.resumeExtension || 'pdf'}`,
+        content: resumeBuffer
+      }
+    ]
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send AI Analysis document notification to admin
+const sendAIAnalysisNotificationToAdmin = async (franchise, documentName, documentBuffer) => {
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+  if (!adminEmail) return;
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: adminEmail,
+    subject: 'New AI Analysis Document Uploaded - CreditDost',
+    html: `
+      <h2>New AI Analysis Document Uploaded</h2>
+      <p>A new document has been uploaded by franchise for AI analysis:</p>
+      <p><strong>Franchise:</strong> ${franchise.businessName}</p>
+      <p><strong>Email:</strong> ${franchise.email}</p>
+      <p><strong>Document:</strong> ${documentName}</p>
+      <p>Please find the attached document for review.</p>
+      <p>Please log in to the admin dashboard to review the document.</p>
+      <p><a href="${process.env.FRONTEND_URL}/admin/ai-analysis">View AI Analysis Documents</a></p>
+      <p>Best regards,<br>The CreditDost System</p>
+    `,
+    attachments: [
+      {
+        filename: documentName,
+        content: documentBuffer
+      }
+    ]
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send AI Analysis response notification to franchise
+const sendAIAnalysisResponseToFranchise = async (franchise, documentName, documentBuffer) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: franchise.email,
+    subject: 'AI Analysis Response - CreditDost',
+    html: `
+      <h2>AI Analysis Response Ready</h2>
+      <p>Hello ${franchise.businessName},</p>
+      <p>Your document has been analyzed and a response is ready:</p>
+      <p><strong>Document:</strong> ${documentName}</p>
+      <p>Please find the attached response document.</p>
+      <p>Please log in to your franchise dashboard to view additional details.</p>
+      <p><a href="${process.env.FRONTEND_URL}/franchise/ai-analysis">View AI Analysis Documents</a></p>
+      <p>Best regards,<br>The CreditDost Team</p>
+    `,
+    attachments: [
+      {
+        filename: documentName,
+        content: documentBuffer
+      }
+    ]
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
+// Send password reset link email
+const sendPasswordResetEmail = async (user, resetToken) => {
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+  
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: user.email,
+    subject: 'Password Reset Request - CreditDost',
+    html: `
+      <h2>Password Reset Request</h2>
+      <p>Hello ${user.name},</p>
+      <p>You have requested to reset your password. Click the link below to set a new password:</p>
+      <p><a href="${resetUrl}" style="background-color: #6200ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Reset Password</a></p>
+      <p>Or copy and paste this link in your browser: ${resetUrl}</p>
+      <p>This link will expire in 1 hour.</p>
+      <p>If you didn't request this, please ignore this email.</p>
+      <p>Best regards,<br>The CreditDost Team</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
 module.exports = {
+  sendJobApplicationEmail,
   sendRegistrationEmail,
   sendAdminNotificationEmail,
   sendSelfRegistrationEmail,
@@ -435,4 +544,7 @@ module.exports = {
   sendCreditReportEmail, // Add the new email function
   sendContactFormEmail,
   sendFranchiseOpportunityEmail,
+  sendPasswordResetEmail,
+  sendAIAnalysisNotificationToAdmin,
+  sendAIAnalysisResponseToFranchise
 };

@@ -13,7 +13,7 @@ const getFranchiseDashboard = async (req, res) => {
     // Get franchise details with assigned packages
     const franchise = await Franchise.findOne({ userId: req.user.id })
       .populate('userId', 'name email phone')
-      .populate('assignedPackages', 'name creditsIncluded');
+      .populate('assignedPackages', 'name creditsIncluded price sortOrder');
     
     if (!franchise) {
       return res.status(404).json({ message: 'Franchise not found' });
@@ -41,7 +41,7 @@ const getFranchiseDashboard = async (req, res) => {
       userId: req.user.id,
       status: 'paid'
     })
-    .populate('packageId', 'name')
+    .populate('packageId', 'name creditsIncluded price sortOrder')
     .sort({ createdAt: -1 })
     .limit(5);
     
@@ -139,7 +139,7 @@ const updateFranchiseLead = async (req, res) => {
 const getFranchiseTransactions = async (req, res) => {
   try {
     const transactions = await Transaction.find({ userId: req.user.id })
-      .populate('packageId', 'name')
+      .populate('packageId', 'name creditsIncluded price sortOrder')
       .sort({ createdAt: -1 });
     
     res.json(transactions);
