@@ -93,10 +93,12 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // List of allowed origins
+    // List of allowed origins - easily expandable for additional origins
     const allowedOrigins = [
       process.env.FRONTEND_URL || "http://localhost:5173",
-      "https://creditdost.onrender.com"
+      "https://creditdost.onrender.com",
+      // Add more origins here as needed
+      // "https://another-domain.com",
     ];
     
     if (allowedOrigins.indexOf(origin) !== -1) {
@@ -106,6 +108,9 @@ const corsOptions = {
     }
   },
   credentials: true,
+  methods: ["GET", "PUT", "DELETE", "POST", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+  exposedHeaders: ["Content-Range", "X-Content-Range"],
 };
 
 app.use(cors(corsOptions));
