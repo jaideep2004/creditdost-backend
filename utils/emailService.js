@@ -84,26 +84,43 @@ const sendSelfRegistrationEmail = async (user, franchise) => {
 
 // Send registration approval email
 const sendRegistrationApprovalEmail = async (user, franchise, password) => {
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: user.email,
-    subject: 'Registration Approved - CreditDost Franchise Platform',
-    html: `
-      <h2>Registration Approved!</h2>
-      <p>Hello ${user.name},</p>
-      <p>Congratulations! Your registration has been approved.</p>
-      <p>Your account is now active. Here are your login credentials:</p>
-      <p><strong>Email:</strong> ${user.email}</p>
-      <p><strong>Password:</strong> ${password || 'Your previously set password'}</p>
-      <p>Please log in and change your password for security.</p>
-      <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>
-      <p><strong>Important:</strong> Please complete your KYC verification in the platform to unlock all features.</p>
-      <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
-      <p>Best regards,<br>The CreditDost Team</p>
-    `,
-  };
-  
-  return transporter.sendMail(mailOptions);
+  try {
+    // Get package names if packages are assigned
+    let packageNames = [];
+    if (franchise.assignedPackages && franchise.assignedPackages.length > 0) {
+      const Package = require('../models/Package'); // Import here to avoid circular dependency
+      const packages = await Package.find({ _id: { $in: franchise.assignedPackages } });
+      packageNames = packages.map(pkg => pkg.name);
+    }
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'Registration Approved - CreditDost Franchise Platform',
+      html: `
+        <h2>Registration Approved!</h2>
+        <p>Hello ${user.name},</p>
+        <p>Congratulations! Your registration has been approved.</p>
+        <p>Your account is now active. Here are your login credentials:</p>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Password:</strong> ${password || 'Your previously set password'}</p>
+        ${packageNames.length > 0 ? `<p><strong>Assigned Package(s):</strong> ${packageNames.join(', ')}</p>` : ''}
+        <p>Please log in and change your password for security.</p>
+        <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>
+        <p><strong>Important:</strong> Please complete your KYC verification in the platform to unlock all features.</p>
+        <p><strong>Next Step:</strong> Please sign the digital agreement in your dashboard to complete your onboarding process.</p>
+        <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
+        <p>Best regards,<br>The CreditDost Team</p>
+      `,
+    };
+    
+    console.log('Attempting to send email to:', user.email, 'with subject:', mailOptions.subject);
+    
+    return await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Error in sendRegistrationApprovalEmail:', error);
+    throw error; // Re-throw the error so the calling function can handle it
+  }
 };
 
 // Send registration rejection email
@@ -165,25 +182,32 @@ const sendKycRejectionEmail = async (user, franchise, reason) => {
 
 // Send account credentials email
 const sendAccountCredentialsEmail = async (user, password) => {
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: user.email,
-    subject: 'Your CreditDost Account Credentials',
-    html: `
-      <h2>Your Account Credentials</h2>
-      <p>Hello ${user.name},</p>
-      <p>Your franchise account has been approved! Here are your login credentials:</p>
-      <p><strong>Email:</strong> ${user.email}</p>
-      <p><strong>Password:</strong> ${password}</p>
-      <p>Please log in and change your password for security.</p>
-      <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>
-      <p><strong>Important:</strong> Please complete your KYC verification in the platform to unlock all features.</p>
-      <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
-      <p>Best regards,<br>The CreditDost Team</p>
-    `,
-  };
-  
-  return transporter.sendMail(mailOptions);
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'Your CreditDost Account Credentials',
+      html: `
+        <h2>Your Account Credentials</h2>
+        <p>Hello ${user.name},</p>
+        <p>Your franchise account has been approved! Here are your login credentials:</p>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Password:</strong> ${password}</p>
+        <p>Please log in and change your password for security.</p>
+        <p><a href="${process.env.FRONTEND_URL}/login">Login to your account</a></p>
+        <p><strong>Important:</strong> Please complete your KYC verification in the platform to unlock all features.</p>
+        <p>Join our WhatsApp group for updates and support: <a href="${process.env.WHATSAPP_GROUP_LINK || '#'}">Click here to join</a></p>
+        <p>Best regards,<br>The CreditDost Team</p>
+      `,
+    };
+    
+    console.log('Attempting to send account credentials email to:', user.email, 'with subject:', mailOptions.subject);
+    
+    return await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Error in sendAccountCredentialsEmail:', error);
+    throw error; // Re-throw the error so the calling function can handle it
+  }
 };
 
 // Send payment success email
@@ -382,6 +406,7 @@ const sendContactFormEmail = async (contactForm) => {
       <p>A new contact form has been submitted with the following details:</p>
       <p><strong>Name:</strong> ${contactForm.name}</p>
       <p><strong>Email:</strong> ${contactForm.email}</p>
+      <p><strong>Mobile Number:</strong> ${contactForm.mobileNumber || 'Not provided'}</p>
       <p><strong>Subject:</strong> ${contactForm.subject || 'No subject provided'}</p>
       <p><strong>Message:</strong></p>
       <p>${contactForm.message}</p>

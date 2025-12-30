@@ -9,8 +9,10 @@ const {
   updateBlog,
   deleteBlog,
   getAdminBlogs,
-  getBlogCategories
-} = require('../controllers/blogController');
+  getBlogCategories,
+  getRecentBlogs,
+  getBlogTags
+} = require('../controllers/blogController');   
 
 // Admin routes
 router.route('/admin')
@@ -27,6 +29,12 @@ router.route('/')
 
 router.route('/categories')
   .get(getBlogCategories);
+
+router.route('/recent')
+  .get(getRecentBlogs);
+
+router.route('/tags')
+  .get(getBlogTags);
 
 router.route('/:slug')
   .get(getBlogBySlug);

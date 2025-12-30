@@ -279,3 +279,55 @@ exports.getBlogCategories = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// @desc    Get recent blog posts
+// @route   GET /api/blogs/recent
+// @access  Public
+exports.getRecentBlogs = async (req, res) => {
+  try {
+    const { limit = 5 } = req.query;
+    
+    const recentBlogs = await Blog.find({ status: 'published' })
+      .populate('author', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .select('title createdAt featuredImage slug');
+    
+    res.json({ recentBlogs });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get all unique tags
+// @route   GET /api/blogs/tags
+// @access  Public
+exports.getBlogTags = async (req, res) => {
+  try {
+    // Get all blogs with their tags
+    const blogs = await Blog.find({ status: 'published' }, 'tags');
+    
+    // Count occurrences of each tag
+    const tagCounts = {};
+    blogs.forEach(blog => {
+      if (blog.tags && Array.isArray(blog.tags)) {
+        blog.tags.forEach(tag => {
+          if (tag && tag.trim() !== '') {
+            const trimmedTag = tag.trim();
+            tagCounts[trimmedTag] = (tagCounts[trimmedTag] || 0) + 1;
+          }
+        });
+      }
+    });
+    
+    // Convert to array format
+    const tags = Object.keys(tagCounts).map(tag => ({
+      name: tag,
+      count: tagCounts[tag]
+    }));
+    
+    res.json({ tags });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

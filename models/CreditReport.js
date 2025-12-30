@@ -60,6 +60,10 @@ const creditReportSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  bureau: {
+    type: String,
+    required: false, // Make optional for backward compatibility
+  },
 }, {
   timestamps: true,
 });
