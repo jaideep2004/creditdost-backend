@@ -97,7 +97,7 @@ const corsOptions = {
     const allowedOrigins = [
       process.env.FRONTEND_URL || "http://localhost:5173",
       "https://creditdost.onrender.com",
-      "https://reactbackend.creditdostlearning.com"
+      "http://localhost:5000"
       // Add more origins here as needed
       // "https://another-domain.com",
     ];

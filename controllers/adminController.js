@@ -687,9 +687,20 @@ const createFranchiseUser = async (req, res) => {
     
     // Send account credentials email to user
     try {
+      // Log email configuration status for debugging
+      console.log('Attempting to send registration approval email to:', user.email);
+      console.log('Temp password generated:', tempPassword ? 'Yes' : 'No');
+      console.log('Assigned packages:', franchise.assignedPackages);
+      
       await sendRegistrationApprovalEmail(user, franchise, tempPassword);
+      console.log('Successfully sent registration approval email to user:', user.email);
     } catch (emailError) {
-      console.error('Failed to send credentials email to user:', emailError);
+      console.error('Failed to send registration approval email to user:', user.email, emailError);
+      console.error('Email error details:', {
+        message: emailError.message,
+        code: emailError.code,
+        stack: emailError.stack
+      });
       // Don't fail the creation if email sending fails
     }
     
@@ -1019,9 +1030,20 @@ const approveRegistration = async (req, res) => {
     
     // Send approval email to franchise user with login credentials
     try {
+      // Log email configuration status for debugging
+      console.log('Attempting to send registration approval email to:', user.email);
+      console.log('Temp password generated for approval:', tempPassword ? 'Yes' : 'No');
+      console.log('Assigned packages:', franchise.assignedPackages);
+      
       await sendRegistrationApprovalEmail(user, franchise, tempPassword);
+      console.log('Successfully sent registration approval email to user:', user.email);
     } catch (emailError) {
-      console.error('Failed to send registration approval email:', emailError);
+      console.error('Failed to send registration approval email to user:', user.email, emailError);
+      console.error('Email error details:', {
+        message: emailError.message,
+        code: emailError.code,
+        stack: emailError.stack
+      });
       // Don't fail the approval if email sending fails
     }
     

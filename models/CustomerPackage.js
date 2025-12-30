@@ -6,15 +6,15 @@ const customerPackageSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  description: {
+  description: { 
     type: String,
     required: true,
   }, 
   price: { 
     type: Number,
-    required: true,
+    required: true,    
     min: 0,
-  },
+  },                        
   creditsIncluded: {
     type: Number,
     required: true,
@@ -48,6 +48,11 @@ const customerPackageSchema = new mongoose.Schema({
     default: 0,
     min: 0,
   },
+  // Franchise packages that can access this customer package
+  availableForPackages: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Package',
+  }],
 }, {
   timestamps: true,
 });

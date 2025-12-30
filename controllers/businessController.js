@@ -16,14 +16,29 @@ const razorpay = new Razorpay({
 // Validation for business form submission
 const validateBusinessForm = (data) => {
   const requiredFields = [
-    'customerName', 'customerEmail', 'customerPhone', 'panNumber', 
-    'aadharNumber', 'pincode', 'state', 'language', 'occupation', 
+    'customerName', 'customerEmail', 'customerPhone', 
+    'pincode', 'state', 'language', 'occupation', 
     'monthlyIncome', 'fullAddress', 'selectedPackage'
   ];
   
   for (const field of requiredFields) {
     if (!data[field] || data[field].toString().trim() === '') {
       return { isValid: false, message: `${field} is required` };
+    }
+  }
+  
+  // Check if optional fields are provided, and if so, validate them
+  if (data.panNumber && data.panNumber.toString().trim() !== '') {
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!panRegex.test(data.panNumber.toUpperCase())) {
+      return { isValid: false, message: 'Invalid PAN number format' };
+    }
+  }
+  
+  if (data.aadharNumber && data.aadharNumber.toString().trim() !== '') {
+    const aadharRegex = /^\d{12}$/;
+    if (!aadharRegex.test(data.aadharNumber)) {
+      return { isValid: false, message: 'Aadhar number must be 12 digits' };
     }
   }
   
@@ -41,13 +56,13 @@ const validateBusinessForm = (data) => {
   
   // Validate PAN number (10 characters)
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-  if (!panRegex.test(data.panNumber.toUpperCase())) {
+  if (data.panNumber && !panRegex.test(data.panNumber.toUpperCase())) {
     return { isValid: false, message: 'Invalid PAN number format' };
   }
   
   // Validate Aadhar number (12 digits)
   const aadharRegex = /^\d{12}$/;
-  if (!aadharRegex.test(data.aadharNumber)) {
+  if (data.aadharNumber && !aadharRegex.test(data.aadharNumber)) {
     return { isValid: false, message: 'Aadhar number must be 12 digits' };
   }
   
@@ -91,8 +106,8 @@ const submitBusinessForm = async (req, res) => {
       customerName,
       customerEmail: customerEmail.toLowerCase(),
       customerPhone,
-      panNumber: panNumber.toUpperCase(),
-      aadharNumber,
+      panNumber: panNumber ? panNumber.toUpperCase() : undefined,
+      aadharNumber: aadharNumber || undefined,
       pincode,
       state,
       language,

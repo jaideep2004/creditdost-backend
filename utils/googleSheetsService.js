@@ -402,10 +402,11 @@ class GoogleSheetsService {
 
       // Format data for Google Sheets
       const rows = [
-        ['Name', 'Email', 'Subject', 'Message', 'Date'], // Header row
+        ['Name', 'Email', 'Mobile Number', 'Subject', 'Message', 'Date'], // Header row
         ...contactData.map(item => [
           item.name,
           item.email,
+          item.mobileNumber || '',
           item.subject || '',
           item.message || '',
           item.createdAt ? item.createdAt.toISOString().split('T')[0] : ''
@@ -415,7 +416,7 @@ class GoogleSheetsService {
       // Update Google Sheet
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: settings.spreadsheetId,
-        range: `Contact Us!A1:E${rows.length}`,
+        range: `Contact Us!A1:F${rows.length}`,
         valueInputOption: 'RAW',
         resource: {
           values: rows

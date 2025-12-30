@@ -6,7 +6,7 @@ require('dotenv').config();
 // Connect to MongoDB
 mongoose.connect(
   process.env.MONGODB_URI || "mongodb://localhost:27017/franchise_management",
-  {
+  { 
     useNewUrlParser: true,
     useUnifiedTopology: true,
   }
