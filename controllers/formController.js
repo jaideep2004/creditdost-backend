@@ -4,11 +4,13 @@ const CreditRepair = require("../models/CreditRepair");
 const ContactForm = require("../models/ContactForm");
 const FranchiseOpportunity = require("../models/FranchiseOpportunity");
 const BusinessForm = require("../models/BusinessForm");
+const SuvidhaCentreApplication = require("../models/SuvidhaCentreApplication");
 const User = require("../models/User");
 const {
   sendContactFormEmail,
   sendFranchiseOpportunityEmail,
   sendBusinessFormSubmissionEmail,
+  sendSuvidhaCentreApplicationEmail,
 } = require("../utils/emailService");
 
 // Validation schema for credit repair form
@@ -23,6 +25,9 @@ const creditRepairSchema = Joi.object({
   problemType: Joi.string().required(),
   creditScore: Joi.string().optional(),
   message: Joi.string().optional(),
+  language: Joi.string().optional(),
+  occupation: Joi.string().optional(),
+  income: Joi.string().optional(),
 });
 
 // Validation schema for contact form
@@ -70,8 +75,33 @@ const businessFormSchema = Joi.object({
   monthlyIncome: Joi.number().positive().required(),
   fullAddress: Joi.string().required(),
   language: Joi.string().optional(),
+  whatsappNumber: Joi.string().optional(),
+  creditScore: Joi.string().optional(),
+  loanAmount: Joi.string().optional(),
+  loanPurpose: Joi.string().optional(),
   selectedPackage: Joi.any().optional(),
 }).options({ stripUnknown: true });
+
+// Validation schema for suvidha centre application form
+const suvidhaCentreApplicationSchema = Joi.object({
+  fullName: Joi.string().min(2).max(100).required(),
+  mobileNumber: Joi.string()
+    .pattern(/^[0-9]{10}$/)
+    .required(),
+  whatsappNumber: Joi.string().pattern(/^[0-9]{10}$/).optional(),
+  email: Joi.string().email().required(),
+  city: Joi.string().required(),
+  state: Joi.string().required(),
+  pincode: Joi.string()
+    .pattern(/^[0-9]{6}$/)
+    .required(),
+  occupation: Joi.string().required(),
+  financeExperience: Joi.string().required(),
+  smartphoneLaptop: Joi.string().required(),
+  communication: Joi.string().required(),
+  investmentReadiness: Joi.string().required(),
+  consent: Joi.boolean().required(),
+});
 
 // Submit credit repair form
 const submitCreditRepairForm = async (req, res) => {
@@ -99,6 +129,9 @@ const submitCreditRepairForm = async (req, res) => {
       problemType,
       creditScore,
       message,
+      language,
+      occupation,
+      income,
     } = req.body;
 
     // Save to database
@@ -111,6 +144,9 @@ const submitCreditRepairForm = async (req, res) => {
       problemType,
       creditScore,
       message,
+      language,
+      occupation,
+      income,
     });
     await creditRepair.save();
 
@@ -299,6 +335,10 @@ const submitBusinessForm = async (req, res) => {
       monthlyIncome,
       fullAddress,
       language,
+      whatsappNumber,
+      creditScore,
+      loanAmount,
+      loanPurpose,
       selectedPackage,
     } = req.body;
 
@@ -317,6 +357,10 @@ const submitBusinessForm = async (req, res) => {
       fullAddress,
       // Set default values for fields not provided in public form
       language: language || "en",
+      whatsappNumber,
+      creditScore,
+      loanAmount,
+      loanPurpose,
       selectedPackage: selectedPackage || undefined,
     });
 
@@ -365,9 +409,93 @@ const submitBusinessForm = async (req, res) => {
   }
 };
 
+// Submit suvidha centre application form
+const submitSuvidhaCentreApplicationForm = async (req, res) => {
+  try {
+    console.log("Received suvidha centre application form data:", req.body);
+    // Validate request body
+    const { error } = suvidhaCentreApplicationSchema.validate(req.body, {
+      abortEarly: false,
+    });
+    if (error) {
+      console.log("Validation errors:", error.details);
+      const errorMessages = error.details.map((detail) => detail.message);
+      return res.status(400).json({
+        message: "Validation error",
+        details: errorMessages,
+      });
+    }
+
+    const {
+      fullName,
+      mobileNumber,
+      whatsappNumber,
+      email,
+      city,
+      state,
+      pincode,
+      occupation,
+      financeExperience,
+      smartphoneLaptop,
+      communication,
+      investmentReadiness,
+      consent,
+    } = req.body;
+
+    // Save to database
+    const suvidhaCentreApplication = new SuvidhaCentreApplication({
+      fullName,
+      mobileNumber,
+      whatsappNumber,
+      email,
+      city,
+      state,
+      pincode,
+      occupation,
+      financeExperience,
+      smartphoneLaptop,
+      communication,
+      investmentReadiness,
+      consent,
+    });
+    await suvidhaCentreApplication.save();
+
+    // Send email to admin
+    try {
+      await sendSuvidhaCentreApplicationEmail(suvidhaCentreApplication);
+    } catch (emailError) {
+      console.error("Failed to send suvidha centre application email to admin:", emailError);
+      // Don't fail the request if email sending fails
+    }
+
+    // Sync with Google Sheets
+    try {
+      await googleSheetsService.initialize();
+      await googleSheetsService.syncSuvidhaCentreApplicationData();
+    } catch (syncError) {
+      console.error(
+        "Failed to sync suvidha centre application data with Google Sheets:",
+        syncError
+      );
+      // Don't fail the request if Google Sheets sync fails
+    }
+
+    res.json({
+      message: "Suvidha Centre application submitted successfully",
+    });
+  } catch (error) {
+    console.error("Suvidha Centre application form submission error:", error);
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   submitCreditRepairForm,
   submitContactForm,
   submitFranchiseOpportunityForm,
   submitBusinessForm,
+  submitSuvidhaCentreApplicationForm,
 };

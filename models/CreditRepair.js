@@ -30,6 +30,15 @@ const creditRepairSchema = new mongoose.Schema({
   message: {
     type: String,
   },
+  language: {
+    type: String,
+  },
+  occupation: {
+    type: String,
+  },
+  income: {
+    type: String,
+  },
 }, {
   timestamps: true
 });

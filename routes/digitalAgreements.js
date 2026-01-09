@@ -43,7 +43,7 @@ router.route('/admin/:id')
 
 router.route('/admin/:id/approve')
   .put(auth, rbac('admin'), approveDigitalAgreement);
-
+ 
 router.route('/admin/:id/reject')
   .put(auth, rbac('admin'), rejectDigitalAgreement);
 

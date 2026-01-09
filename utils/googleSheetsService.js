@@ -6,6 +6,7 @@ const User = require('../models/User');
 const CreditRepair = require('../models/CreditRepair');
 const ContactForm = require('../models/ContactForm');
 const FranchiseOpportunity = require('../models/FranchiseOpportunity');
+const SuvidhaCentreApplication = require('../models/SuvidhaCentreApplication');
 const crypto = require('crypto');
 
 // Check if googleapis is properly installed
@@ -95,7 +96,8 @@ class GoogleSheetsService {
         'Credit Score Repair',
         'Contact Us',
         'New Registration',
-        'Franchise Opportunity'
+        'Franchise Opportunity',
+        'Suvidha Centre'
       ]; 
 
       // Get existing sheets
@@ -274,11 +276,12 @@ class GoogleSheetsService {
 
       // Format data for Google Sheets
       const rows = [
-        ['Customer Name', 'Customer Email', 'Customer Phone', 'PAN Number', 'Aadhar Number', 'City', 'State', 'Pincode', 'Occupation', 'Monthly Income', 'Date'], // Header row
+        ['Customer Name', 'Customer Email', 'Customer Phone', 'WhatsApp Number', 'PAN Number', 'Aadhar Number', 'City', 'State', 'Pincode', 'Occupation', 'Monthly Income', 'Credit Score', 'Loan Amount', 'Loan Purpose', 'Date'], // Header row
         ...businessForms.map(form => [
           form.customerName,
           form.customerEmail,
           form.customerPhone,
+          form.whatsappNumber || '',
           form.panNumber || '',
           form.aadharNumber || '',
           form.city || '',
@@ -286,6 +289,9 @@ class GoogleSheetsService {
           form.pincode || '',
           form.occupation || '',
           form.monthlyIncome ? form.monthlyIncome.toString() : '',
+          form.creditScore || '',
+          form.loanAmount || '',
+          form.loanPurpose || '',
           form.createdAt.toISOString().split('T')[0]
         ])
       ];
@@ -293,7 +299,7 @@ class GoogleSheetsService {
       // Update Google Sheet
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: settings.spreadsheetId,
-        range: `Apply for Loan!A1:K${rows.length}`,
+        range: `Apply for Loan!A1:O${rows.length}`,
         valueInputOption: 'RAW',
         resource: {
           values: rows
@@ -457,20 +463,22 @@ class GoogleSheetsService {
         return { success: false, message: 'Failed to create required tabs' };
       }
 
-      // Get users from database
-      const users = await User.find({ role: 'franchise_user' }).sort({ createdAt: -1 });
+      // Get users from database with explicit field selection to ensure all fields are retrieved
+      const users = await User.find({ role: 'franchise_user' })
+        .select('name email phone state pincode language createdAt')
+        .sort({ createdAt: -1 });
 
       // Format data for Google Sheets
       const rows = [
         ['Name', 'Email', 'Phone', 'State', 'Pincode', 'Language', 'Date'], // Header row
         ...users.map(user => [
-          user.name,
-          user.email,
+          user.name || '',
+          user.email || '',
           user.phone || '',
           user.state || '',
           user.pincode || '',
           user.language || '',
-          user.createdAt.toISOString().split('T')[0]
+          user.createdAt ? user.createdAt.toISOString().split('T')[0] : ''
         ])
       ];
 
@@ -507,7 +515,8 @@ class GoogleSheetsService {
       creditRepair: await this.syncCreditRepairData(),
       contactForm: await this.syncContactFormData(),
       registration: await this.syncRegistrationData(),
-      franchiseOpportunity: await this.syncFranchiseOpportunityData()
+      franchiseOpportunity: await this.syncFranchiseOpportunityData(),
+      suvidhaCentreApplication: await this.syncSuvidhaCentreApplicationData()
     };
     
     console.log('All data sync completed with results:', results);
@@ -573,6 +582,86 @@ class GoogleSheetsService {
       return { success: true, count: franchiseOpportunityData.length };
     } catch (error) {
       console.error('Failed to sync franchise opportunity data:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Sync suvidha centre application data to Google Sheets
+  async syncSuvidhaCentreApplicationData() {
+    try {
+      const settings = await GoogleSheet.findOne({ isActive: true });
+      if (!settings || !settings.spreadsheetId) {
+        return { success: false, message: 'Google Sheets integration not configured' };
+      }
+
+      // Check if suvidhaCentre tab exists in settings, if not, create default configuration
+      let tabSettings = settings.tabs.get('suvidhaCentre');
+      if (!tabSettings) {
+        // Create default configuration for suvidhaCentre tab
+        settings.tabs.set('suvidhaCentre', {
+          enabled: true,
+          lastSync: null
+        });
+        await settings.save();
+        tabSettings = settings.tabs.get('suvidhaCentre');
+        console.log('Created default suvidhaCentre tab configuration');
+      }
+      
+      if (!tabSettings.enabled) {
+        return { success: false, message: 'Suvidha Centre tab not enabled' };
+      }
+
+      // Create required tabs if they don't exist
+      const tabsCreated = await this.createRequiredTabs(settings.spreadsheetId);
+      if (!tabsCreated) {
+        console.log('Failed to create required tabs, aborting sync');
+        return { success: false, message: 'Failed to create required tabs' };
+      }
+
+      // Get suvidha centre applications from database
+      const suvidhaCentreApplications = await SuvidhaCentreApplication.find({}).sort({ createdAt: -1 });
+
+      // Format data for Google Sheets
+      const rows = [
+        ['Full Name', 'Mobile Number', 'WhatsApp Number', 'Email', 'City', 'State', 'Pincode', 'Occupation', 'Finance Experience', 'Smartphone/Laptop', 'Communication Skills', 'Investment Readiness', 'Consent', 'Date'], // Header row
+        ...suvidhaCentreApplications.map(application => [
+          application.fullName,
+          application.mobileNumber,
+          application.whatsappNumber || '',
+          application.email,
+          application.city || '',
+          application.state || '',
+          application.pincode || '',
+          application.occupation || '',
+          application.financeExperience || '',
+          application.smartphoneLaptop || '',
+          application.communication || '',
+          application.investmentReadiness || '',
+          application.consent ? 'Yes' : 'No',
+          application.createdAt ? application.createdAt.toISOString().split('T')[0] : ''
+        ])
+      ];
+
+      // Update Google Sheet
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: settings.spreadsheetId,
+        range: `Suvidha Centre!A1:N${rows.length}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: rows
+        }
+      });
+
+      // Update last sync timestamp
+      settings.tabs.set('suvidhaCentre', {
+        ...tabSettings,
+        lastSync: new Date()
+      });
+      await settings.save();
+
+      return { success: true, count: suvidhaCentreApplications.length };
+    } catch (error) {
+      console.error('Failed to sync suvidha centre application data:', error);
       return { success: false, error: error.message };
     }
   }

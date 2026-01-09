@@ -753,22 +753,34 @@ const rechargeFranchiseCredits = async (req, res) => {
     await franchise.save();
     
     // Log the transaction (optional)
-    const transaction = new Transaction({
-      userId: franchise.userId,
-      amount: 0, // Free recharge
-      currency: 'INR',
-      status: 'paid',
-      paymentMethod: 'admin_recharge',
-      remarks: remarks || `Admin credit recharge: ${credits} credits`,
-      metadata: {
-        adminId: req.user.id,
-        oldCredits,
-        newCredits: franchise.credits,
-        creditsAdded: credits
+    // Only create transaction if franchise has a valid userId
+    if (franchise.userId) {
+      const transaction = new Transaction({
+        userId: franchise.userId,
+        franchiseId: franchise._id,
+        amount: 0, // Free recharge
+        currency: 'INR',
+        status: 'paid',
+        paymentMethod: 'admin_recharge',
+        remarks: remarks || `Admin credit recharge: ${credits} credits`,
+        metadata: {
+          adminId: req.user.id,
+          oldCredits,
+          newCredits: franchise.credits,
+          creditsAdded: credits
+        }
+      });
+      
+      try {
+        await transaction.save();
+      } catch (transactionError) {
+        console.error('Error saving transaction:', transactionError);
+        // If transaction fails, we still want to return success for the credit recharge
+        // since the franchise was updated successfully
       }
-    });
-    
-    await transaction.save();
+    } else {
+      console.warn(`Franchise ${franchise._id} has no userId, skipping transaction creation`);
+    }
     
     res.json({
       message: 'Credits recharged successfully',
@@ -1184,6 +1196,194 @@ const updateFranchiseCertificateName = async (req, res) => {
   }
 };
 
+// Get performance overview data for charts
+const getPerformanceOverview = async (req, res) => {
+  try {
+    // Get date range from query parameters (default to last 30 days)
+    const { period = 'monthly', startDate, endDate } = req.query;
+    
+    let start, end;
+    
+    // Set date range based on period
+    if (startDate && endDate) {
+      start = new Date(startDate);
+      end = new Date(endDate);
+    } else {
+      const now = new Date();
+      switch(period) {
+        case 'weekly':
+          start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'monthly':
+          start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          break;
+        case 'quarterly':
+          start = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+          break;
+        case 'yearly':
+          start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+          break;
+        default:
+          start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      }
+      end = now;
+    }
+    
+    // Format dates for aggregation
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    
+    // Get daily transaction data for revenue chart
+    const revenueData = await Transaction.aggregate([
+      {
+        $match: {
+          status: 'paid',
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
+          },
+          total: { $sum: "$amount" },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.date": 1 }
+      }
+    ]);
+    
+    // Get daily lead data
+    const leadData = await Lead.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.date": 1 }
+      }
+    ]);
+    
+    // Get franchise growth data
+    const franchiseData = await Franchise.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.date": 1 }
+      }
+    ]);
+    
+    // Prepare chart data
+    const chartData = [];
+    
+    // Create date range
+    const dateRange = [];
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      dateRange.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Map data to chart format
+    dateRange.forEach(date => {
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const revenue = revenueData.find(d => d._id.date === dateStr)?.total || 0;
+      const leads = leadData.find(d => d._id.date === dateStr)?.count || 0;
+      const franchises = franchiseData.find(d => d._id.date === dateStr)?.count || 0;
+      
+      chartData.push({
+        date: dateStr,
+        revenue,
+        leads,
+        franchises
+      });
+    });
+    
+    // Calculate totals and trends
+    const totalRevenue = revenueData.reduce((sum, item) => sum + item.total, 0);
+    const totalLeads = leadData.reduce((sum, item) => sum + item.count, 0);
+    const totalFranchises = franchiseData.reduce((sum, item) => sum + item.count, 0);
+    
+    // Calculate previous period for trend comparison
+    const prevStart = new Date(start.getTime() - (end.getTime() - start.getTime()));
+    const prevEnd = new Date(start);
+    
+    const prevRevenueData = await Transaction.aggregate([
+      {
+        $match: {
+          status: 'paid',
+          createdAt: { $gte: prevStart, $lte: prevEnd }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$amount" }
+        }
+      }
+    ]);
+    
+    const prevLeadData = await Lead.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: prevStart, $lte: prevEnd }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    const prevTotalRevenue = prevRevenueData.length > 0 ? prevRevenueData[0].total : 0;
+    const prevTotalLeads = prevLeadData.length > 0 ? prevLeadData[0].count : 0;
+    
+    const revenueGrowth = prevTotalRevenue ? ((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 : 0;
+    const leadsGrowth = prevTotalLeads ? ((totalLeads - prevTotalLeads) / prevTotalLeads) * 100 : 0;
+    
+    res.json({
+      chartData,
+      summary: {
+        totalRevenue,
+        totalLeads,
+        totalFranchises,
+        revenueGrowth: revenueGrowth.toFixed(2),
+        leadsGrowth: leadsGrowth.toFixed(2)
+      },
+      period,
+      startDate: start,
+      endDate: end
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getRecentActivities,
@@ -1216,4 +1416,5 @@ module.exports = {
   rejectRegistration,
   deleteFranchise,
   updateFranchiseCertificateName,
+  getPerformanceOverview,
 };
