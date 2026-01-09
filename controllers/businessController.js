@@ -163,8 +163,9 @@ const verifyPayment = async (req, res) => {
       businessFormId
     } = req.body;
     
-    // Find the business form
-    const businessForm = await BusinessForm.findById(businessFormId);
+    // Find the business form with populated selected package
+    const businessForm = await BusinessForm.findById(businessFormId)
+      .populate('selectedPackage', 'name price businessPayoutPercentage businessPayoutType businessPayoutFixedAmount');
     if (!businessForm) {
       return res.status(404).json({ message: 'Business form not found' });
     }

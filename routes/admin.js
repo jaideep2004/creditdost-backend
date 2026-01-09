@@ -29,6 +29,7 @@ const {
   rejectRegistration,
   deleteFranchise,
   updateFranchiseCertificateName,
+  getPerformanceOverview,
   // Credit recharge functions
   getAllFranchisesWithCredits,
   rechargeFranchiseCredits,
@@ -52,6 +53,11 @@ router.get('/dashboard', auth, rbac('admin'), getDashboardStats);
 // @desc    Get recent activities for admin dashboard
 // @access  Private/Admin
 router.get('/dashboard/activities', auth, rbac('admin'), getRecentActivities);
+
+// @route   GET /api/admin/dashboard/performance
+// @desc    Get performance overview data for admin dashboard
+// @access  Private/Admin
+router.get('/dashboard/performance', auth, rbac('admin'), getPerformanceOverview);
 
 // @route   GET /api/admin/users
 // @desc    Get all users

@@ -442,6 +442,35 @@ const sendFranchiseOpportunityEmail = async (franchiseOpportunity) => {
   return transporter.sendMail(mailOptions);
 };
 
+// Send suvidha centre application form submission email to admin
+const sendSuvidhaCentreApplicationEmail = async (suvidhaCentreApplication) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Send to admin email or fallback to sender email
+    subject: `New Suvidha Centre Application - CreditDost`,
+    html: `
+      <h2>New Suvidha Centre Application</h2>
+      <p>A new suvidha centre application form has been submitted with the following details:</p>
+      <p><strong>Full Name:</strong> ${suvidhaCentreApplication.fullName}</p>
+      <p><strong>Email:</strong> ${suvidhaCentreApplication.email}</p>
+      <p><strong>Mobile Number:</strong> ${suvidhaCentreApplication.mobileNumber}</p>
+      <p><strong>WhatsApp Number:</strong> ${suvidhaCentreApplication.whatsappNumber || 'Not provided'}</p>
+      <p><strong>City:</strong> ${suvidhaCentreApplication.city}</p>
+      <p><strong>State:</strong> ${suvidhaCentreApplication.state}</p>
+      <p><strong>Pincode:</strong> ${suvidhaCentreApplication.pincode}</p>
+      <p><strong>Occupation:</strong> ${suvidhaCentreApplication.occupation}</p>
+      <p><strong>Finance Experience:</strong> ${suvidhaCentreApplication.financeExperience}</p>
+      <p><strong>Smartphone/Laptop:</strong> ${suvidhaCentreApplication.smartphoneLaptop}</p>
+      <p><strong>Communication Skills:</strong> ${suvidhaCentreApplication.communication}</p>
+      <p><strong>Investment Readiness:</strong> ${suvidhaCentreApplication.investmentReadiness}</p>
+      <p><strong>Consent:</strong> ${suvidhaCentreApplication.consent ? 'Yes' : 'No'}</p>
+      <p>Best regards,<br>The CreditDost System</p>
+    `,
+  };
+  
+  return transporter.sendMail(mailOptions);
+};
+
 // Send job application email
 const sendJobApplicationEmail = async (applicationData, resumeBuffer) => {
   const mailOptions = {
@@ -569,6 +598,7 @@ module.exports = {
   sendCreditReportEmail, // Add the new email function
   sendContactFormEmail,
   sendFranchiseOpportunityEmail,
+  sendSuvidhaCentreApplicationEmail,
   sendPasswordResetEmail,
   sendAIAnalysisNotificationToAdmin,
   sendAIAnalysisResponseToFranchise

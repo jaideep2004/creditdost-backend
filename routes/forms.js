@@ -4,7 +4,8 @@ const {
   submitCreditRepairForm,
   submitContactForm,
   submitFranchiseOpportunityForm,
-  submitBusinessForm
+  submitBusinessForm,
+  submitSuvidhaCentreApplicationForm
 } = require('../controllers/formController');
 
 // Credit repair form submission
@@ -22,5 +23,9 @@ router.route('/franchise-opportunity')
 // Business form submission (apply for loan)
 router.route('/business')
   .post(submitBusinessForm);
+
+// Suvidha Centre application form submission
+router.route('/suvidha-centre')
+  .post(submitSuvidhaCentreApplicationForm);
 
 module.exports = router;

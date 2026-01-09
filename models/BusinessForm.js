@@ -58,6 +58,22 @@ const businessFormSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  whatsappNumber: {
+    type: String,
+    required: false,
+  },
+  creditScore: {
+    type: String,
+    required: false,
+  },
+  loanAmount: {
+    type: String,
+    required: false,
+  },
+  loanPurpose: {
+    type: String,
+    required: false,
+  },
   selectedPackage: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CustomerPackage',
