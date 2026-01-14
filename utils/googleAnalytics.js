@@ -5,10 +5,27 @@ class GoogleAnalyticsService {
     this.propertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
     
     // Initialize the client with service account credentials
-    // You'll need to set up a service account and download the JSON key file
-    this.analyticsDataClient = new BetaAnalyticsDataClient({
-      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS || './config/service-account-key.json'
-    });
+    // Supports both file-based and environment variable-based authentication
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_CONTENT) {
+      // Use credentials from environment variable
+      try {
+        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_CONTENT);
+        this.analyticsDataClient = new BetaAnalyticsDataClient({
+          credentials: credentials
+        });
+      } catch (error) {
+        console.error('Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS_CONTENT:', error.message);
+        console.error('Falling back to file-based authentication');
+        this.analyticsDataClient = new BetaAnalyticsDataClient({
+          keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS || './config/service-account-key.json'
+        });
+      }
+    } else {
+      // Use credentials from file (fallback)
+      this.analyticsDataClient = new BetaAnalyticsDataClient({
+        keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS || './config/service-account-key.json'
+      });
+    }
   }
 
   /**
