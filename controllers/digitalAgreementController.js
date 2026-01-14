@@ -8,27 +8,40 @@ const path = require("path");
 const axios = require("axios");
 const { PDFDocument, rgb } = require("pdf-lib");
 
+const drawTextFromTop = (page, text, x, yFromTop, options = {}) => {
+  const { height } = page.getSize();
+
+  page.drawText(text || "", {
+    x,
+    y: height - yFromTop,
+    ...options,
+  });
+};
+
 // Coordinates for PDF editing
 const PDF_COORDINATES = {
   // Page 1 coordinates
   page1: {
-    date: { x: 409, y_top: 107, y_bottom: 0 },
-    name: { x: 112.67, y_top: 450.0, y_bottom: 391.8 },
-    pan: { x: 105.33, y_top: 473.33, y_bottom: 368.47 },
-    phone: { x: 120.67, y_top: 497.33, y_bottom: 344.47 },
-    aadhar: { x: 121.33, y_top: 520.67, y_bottom: 321.13 },
-    address: { x: 128.67, y_top: 544.67, y_bottom: 297.13 },
-    packagePrice: { x: 72.0, y_top: 459.33, y_bottom: 382.47 }, // Page 2
+    date: {x: 410.0, y_top: 109.33, y_bottom: 732.47},
+    name: { x: 111.33, y_top: 456.0, y_bottom: 385.8 },
+    pan: { x: 104.67, y_top: 477.33, y_bottom: 364.47 },
+    phone: { x: 119.33, y_top: 501.33, y_bottom: 340.47 },
+    aadhar: { x: 120.67, y_top: 526.0, y_bottom: 315.8 },
+    address: { x: 129.33, y_top: 552.0, y_bottom: 289.8 },
+    packagePrice: { x: 76.0, y_top: 468.0, y_bottom: 373.8 }, // Page 2
   },
   // Page 8 coordinates
   page8: {
-    address: { x: 154.0, y_top: 234.67, y_bottom: 607.13 },
-    name: { x: 111.33, y_top: 608.67, y_bottom: 233.13 },
-    date: { x: 104.0, y_top: 659.33, y_bottom: 182.47 },
-    mobile: { x: 116.67, y_top: 682.0, y_bottom: 159.8 },
-    address2: { x: 124.0, y_top: 705.33, y_bottom: 136.47 },
-    pan: { x: 104.0, y_top: 728.67, y_bottom: 113.13 },
-    aadhar: { x: 118.67, y_top: 755.33, y_bottom: 86.47 },
+    address: { x: 158.67, y_top: 211.33, y_bottom: 630.47 },
+    name: { x: 114.0, y_top: 630.67, y_bottom: 211.13 },
+    date: { x: 108.0, y_top: 678.0, y_bottom: 163.8 },
+    mobile: { x: 114.67, y_top: 702.0, y_bottom: 139.8 },
+    address2: { x: 126.67, y_top: 725.33, y_bottom: 116.47 },
+    pan: { x: 112.0, y_top: 751.33, y_bottom: 90.47 },
+  },
+  // Page 9 coordinates
+  page9: {
+    aadhar: { x: 121.33, y_top: 85.33, y_bottom: 756.47 },
   },
 };
 
@@ -46,170 +59,162 @@ const getSurepassApiKeyValue = async () => {
 // Generate PDF with user data using coordinates
 const generatePdfWithUserData = async (templatePath, userData) => {
   try {
-    // Check if template exists
     if (!fs.existsSync(templatePath)) {
       throw new Error("Template PDF not found");
     }
 
-    // Load the PDF template
     const templateBytes = fs.readFileSync(templatePath);
     const pdfDoc = await PDFDocument.load(templateBytes);
 
-    // Embed font
     const font = await pdfDoc.embedFont("Helvetica");
-
-    // Get pages
     const pages = pdfDoc.getPages();
 
-    // Get current date for date fields
     const currentDate = new Date().toLocaleDateString("en-IN");
-
-    // Define black color
     const blackColor = rgb(0, 0, 0);
+    const fontSize = 12;
 
-    // Edit Page 1
+    /* ---------------- PAGE 1 ---------------- */
     if (pages.length >= 1) {
       const page1 = pages[0];
 
-      // Add date
-      page1.drawText(currentDate, {
-        x: PDF_COORDINATES.page1.date.x,
-        y: PDF_COORDINATES.page1.date.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page1,
+        currentDate,
+        PDF_COORDINATES.page1.date.x,
+        PDF_COORDINATES.page1.date.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
 
-      // Add user name
-      page1.drawText(userData.name || "", {
-        x: PDF_COORDINATES.page1.name.x,
-        y: PDF_COORDINATES.page1.name.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page1,
+        userData.name,
+        PDF_COORDINATES.page1.name.x,
+        PDF_COORDINATES.page1.name.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
 
-      // Add PAN
-      page1.drawText(userData.pan || "", {
-        x: PDF_COORDINATES.page1.pan.x,
-        y: PDF_COORDINATES.page1.pan.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page1,
+        userData.pan,
+        PDF_COORDINATES.page1.pan.x,
+        PDF_COORDINATES.page1.pan.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
 
-      // Add phone
-      page1.drawText(userData.phone || "", {
-        x: PDF_COORDINATES.page1.phone.x,
-        y: PDF_COORDINATES.page1.phone.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page1,
+        userData.phone,
+        PDF_COORDINATES.page1.phone.x,
+        PDF_COORDINATES.page1.phone.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
 
-      // Add Aadhar
-      page1.drawText(userData.aadhar || "", {
-        x: PDF_COORDINATES.page1.aadhar.x,
-        y: PDF_COORDINATES.page1.aadhar.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page1,
+        userData.aadhar,
+        PDF_COORDINATES.page1.aadhar.x,
+        PDF_COORDINATES.page1.aadhar.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
 
-      // Add address
-      page1.drawText(userData.address || "", {
-        x: PDF_COORDINATES.page1.address.x,
-        y: PDF_COORDINATES.page1.address.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page1,
+        userData.address,
+        PDF_COORDINATES.page1.address.x,
+        PDF_COORDINATES.page1.address.y_top,
+        {
+          size: fontSize,
+          font,
+          color: blackColor,
+          maxWidth: 300,
+          lineHeight: 14,
+        }
+      );
     }
 
-    // Edit Page 2 (for package price)
+    /* ---------------- PAGE 2 ---------------- */
     if (pages.length >= 2) {
       const page2 = pages[1];
-      page2.drawText(userData.packagePrice || "", {
-        x: PDF_COORDINATES.page1.packagePrice.x,
-        y: PDF_COORDINATES.page1.packagePrice.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+
+      drawTextFromTop(
+        page2,
+        userData.packagePrice,
+        PDF_COORDINATES.page1.packagePrice.x,
+        PDF_COORDINATES.page1.packagePrice.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
     }
 
-    // Edit Page 8
+    /* ---------------- PAGE 8 ---------------- */
     if (pages.length >= 8) {
-      const page8 = pages[7]; // 0-indexed, so page 8 is index 7
+      const page8 = pages[7];
 
-      // Add address
-      page8.drawText(userData.address || "", {
-        x: PDF_COORDINATES.page8.address.x,
-        y: PDF_COORDINATES.page8.address.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page8,
+        userData.address,
+        PDF_COORDINATES.page8.address.x,
+        PDF_COORDINATES.page8.address.y_top,
+        { size: fontSize, font, color: blackColor, maxWidth: 300 }
+      );
 
-      // Add name
-      page8.drawText(userData.name || "", {
-        x: PDF_COORDINATES.page8.name.x,
-        y: PDF_COORDINATES.page8.name.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page8,
+        userData.name,
+        PDF_COORDINATES.page8.name.x,
+        PDF_COORDINATES.page8.name.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
 
-      // Add date
-      page8.drawText(currentDate, {
-        x: PDF_COORDINATES.page8.date.x,
-        y: PDF_COORDINATES.page8.date.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page8,
+        currentDate,
+        PDF_COORDINATES.page8.date.x,
+        PDF_COORDINATES.page8.date.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
 
-      // Add mobile
-      page8.drawText(userData.phone || "", {
-        x: PDF_COORDINATES.page8.mobile.x,
-        y: PDF_COORDINATES.page8.mobile.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page8,
+        userData.phone,
+        PDF_COORDINATES.page8.mobile.x,
+        PDF_COORDINATES.page8.mobile.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
 
-      // Add address (again)
-      page8.drawText(userData.address || "", {
-        x: PDF_COORDINATES.page8.address2.x,
-        y: PDF_COORDINATES.page8.address2.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page8,
+        userData.address,
+        PDF_COORDINATES.page8.address2.x,
+        PDF_COORDINATES.page8.address2.y_top,
+        { size: fontSize, font, color: blackColor, maxWidth: 300 }
+      );
 
-      // Add PAN
-      page8.drawText(userData.pan || "", {
-        x: PDF_COORDINATES.page8.pan.x,
-        y: PDF_COORDINATES.page8.pan.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+      drawTextFromTop(
+        page8,
+        userData.pan,
+        PDF_COORDINATES.page8.pan.x,
+        PDF_COORDINATES.page8.pan.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
 
-      // Add Aadhar
-      page8.drawText(userData.aadhar || "", {
-        x: PDF_COORDINATES.page8.aadhar.x,
-        y: PDF_COORDINATES.page8.aadhar.y_top,
-        size: 12,
-        font: font,
-        color: blackColor,
-      });
+
     }
 
-    // Save the modified PDF
+    /* ---------------- PAGE 9 ---------------- */
+    if (pages.length >= 9) {
+      const page9 = pages[8];
+
+      drawTextFromTop(
+        page9,
+        userData.aadhar,
+        PDF_COORDINATES.page9.aadhar.x,
+        PDF_COORDINATES.page9.aadhar.y_top,
+        { size: fontSize, font, color: blackColor }
+      );
+    }
+
     const pdfBytes = await pdfDoc.save();
 
-    // Generate a unique filename for the user's copy
     const fileName = `agreement_${Date.now()}_${userData.name.replace(
       /\s+/g,
       "_"
@@ -220,19 +225,13 @@ const generatePdfWithUserData = async (templatePath, userData) => {
       fileName
     );
 
-    // Ensure the directory exists
-    const dir = path.dirname(outputPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    // Write the PDF to file
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, pdfBytes);
 
     return outputPath;
-  } catch (error) {
-    console.error("Error generating PDF with user data:", error);
-    throw error;
+  } catch (err) {
+    console.error("PDF generation error:", err);
+    throw err;
   }
 };
 
@@ -255,7 +254,9 @@ const initiateEsign = async (req, res) => {
     const baseUrl = "https://kyc-api.surepass.app";
 
     // Find the digital agreement for this user to update transaction ID
-    const digitalAgreement = await DigitalAgreement.findOne({ userId: req.user.id });
+    const digitalAgreement = await DigitalAgreement.findOne({
+      userId: req.user.id,
+    });
 
     // Call Surepass eSign API to initiate signing with correct request structure
     const response = await axios.post(
@@ -338,16 +339,17 @@ const eSignWebhook = async (req, res) => {
     //   return res.status(401).json({ message: 'Invalid signature' });
     // }
 
-    const { transaction_id, client_id, status, signed_document_url } = req.body.data;
+    const { transaction_id, client_id, status, signed_document_url } =
+      req.body.data;
 
     // Find the digital agreement by transaction ID - try multiple possible fields for flexibility
     // According to SurePass documentation and common integration patterns
     const digitalAgreement = await DigitalAgreement.findOne({
       $or: [
-        { transactionId: transaction_id },  // Standard transaction_id field
-        { transactionId: client_id },       // SurePass client_id field
-        { transactionId: req.body.data.id } // Alternative id field sometimes used
-      ]
+        { transactionId: transaction_id }, // Standard transaction_id field
+        { transactionId: client_id }, // SurePass client_id field
+        { transactionId: req.body.data.id }, // Alternative id field sometimes used
+      ],
     });
 
     if (!digitalAgreement) {
@@ -562,12 +564,10 @@ const getDigitalAgreement = async (req, res) => {
 
       // Check if template exists
       if (!fs.existsSync(templatePath)) {
-        return res
-          .status(500)
-          .json({
-            message:
-              "Agreement template not found. Please contact administrator.",
-          });
+        return res.status(500).json({
+          message:
+            "Agreement template not found. Please contact administrator.",
+        });
       }
 
       // Get user data for PDF editing
@@ -668,8 +668,9 @@ const submitSignedPdf = async (req, res) => {
     }
 
     // Inform user that this process is now automated
-    res.status(400).json({ 
-      message: "Manual submission is no longer required. The system automatically tracks eSign completion via webhook."
+    res.status(400).json({
+      message:
+        "Manual submission is no longer required. The system automatically tracks eSign completion via webhook.",
     });
   } catch (error) {
     console.error("Error handling signed PDF submission:", error);
