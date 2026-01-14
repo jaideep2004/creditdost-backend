@@ -108,13 +108,20 @@ const verifyPayment = async (req, res) => {
     
     await transaction.save();
     
-    // Update franchise credits
+    // Update franchise credits and package access
     const franchise = await Franchise.findOne({ userId: transaction.userId });
     if (franchise) {
       const pkg = await Package.findById(transaction.packageId);
       if (pkg) {
         franchise.credits += pkg.creditsIncluded;
         franchise.totalCreditsPurchased += pkg.creditsIncluded;
+        
+        // Add the purchased package to assigned packages to ensure access to appropriate customer packages
+        const packageIdString = transaction.packageId.toString();
+        if (!franchise.assignedPackages.some(pkg => pkg.toString() === packageIdString)) {
+          franchise.assignedPackages.push(transaction.packageId);
+        }
+        
         await franchise.save();
         
         // Process referral bonus if applicable

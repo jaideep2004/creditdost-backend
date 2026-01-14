@@ -18,13 +18,17 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
+const path = require('path');
+
 // Storage configuration for local development
 const localStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, path.join(__dirname, '../../uploads/'));
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
+    // Replace spaces and special characters in filenames to prevent URL issues
+    const cleanFilename = file.originalname.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+    cb(null, Date.now() + '-' + cleanFilename);
   },
 });
 

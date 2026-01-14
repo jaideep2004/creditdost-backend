@@ -299,6 +299,61 @@ exports.getRecentBlogs = async (req, res) => {
   }
 };
 
+// @desc    Upload blog image
+// @route   POST /api/admin/blogs/upload-image
+// @access  Private/Admin
+exports.uploadBlogImage = async (req, res) => {
+  try {
+    const upload = require('../utils/fileUpload').upload;
+    
+    // Use the same upload middleware as in fileUpload.js
+    const imageUpload = upload.single('image');
+    
+    imageUpload(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ message: 'File upload error', error: err.message });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ message: 'No image file uploaded' });
+      }
+      
+      // For local development, we need to make the URL accessible
+      if (process.env.NODE_ENV !== 'production') {
+        // If it's a relative path, make it accessible via the server
+        // Normalize the path to use forward slashes
+        const normalizedPath = req.file.path.replace(/\\/g, '/');
+        
+        // Check if the file is in the uploads directory regardless of absolute or relative path
+        if (normalizedPath.includes('uploads/')) {
+          // Extract just the filename from the full path
+          const fileName = req.file.path.split(/[\\/]/).pop();
+          const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${fileName}`;
+          
+          return res.json({ 
+            imageUrl: imageUrl,
+            fileName: fileName,
+            originalName: req.file.originalname
+          });
+        }
+      }
+      
+      // For production, normalize the path and return the correct URL
+      // Extract just the filename from the full path
+      const fileName = req.file.path.split(/[\\/]/).pop();
+      const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${fileName}`;
+      
+      res.json({ 
+        imageUrl: imageUrl,
+        fileName: fileName,
+        originalName: req.file.originalname
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // @desc    Get all unique tags
 // @route   GET /api/blogs/tags
 // @access  Public

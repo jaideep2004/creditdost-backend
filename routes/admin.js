@@ -9,6 +9,7 @@ const {
   getAllLeads,
   getLeadById,
   updateLead,
+  deleteLead,
   getAllTransactions,
   getTransactionById,
   getAllPayouts,
@@ -98,6 +99,11 @@ router.get('/leads/:id', auth, rbac('admin'), getLeadById);
 // @desc    Update lead
 // @access  Private/Admin
 router.put('/leads/:id', auth, rbac('admin'), updateLead);
+
+// @route   DELETE /api/admin/leads/:id
+// @desc    Delete lead
+// @access  Private/Admin
+router.delete('/leads/:id', auth, rbac('admin'), deleteLead);
 
 // @route   GET /api/admin/transactions
 // @desc    Get all transactions

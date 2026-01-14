@@ -91,7 +91,35 @@ const getAllFranchises = async (req, res) => {
       .populate('assignedPackages', 'name price creditsIncluded')
       .sort({ createdAt: -1 });
     
-    res.json(franchises);
+    // Enhance each franchise with purchased packages information
+    const Transaction = require('../models/Transaction');
+    const enhancedFranchises = await Promise.all(
+      franchises.map(async (franchise) => {
+        const transactions = await Transaction.find({
+          franchiseId: franchise._id,
+          status: 'paid',
+        }).populate('packageId');
+        
+        const purchasedPackages = transactions
+          .filter(transaction => transaction.packageId) // Only valid transactions with package
+          .map(transaction => transaction.packageId);
+        
+        // Combine assigned and purchased packages for the response
+        const allPackages = {
+          assigned: franchise.assignedPackages,
+          purchased: purchasedPackages,
+          all: [...franchise.assignedPackages, ...purchasedPackages]
+        };
+        
+        // Return franchise data with both assigned and purchased packages
+        return {
+          ...franchise.toObject(),
+          allPackages: allPackages
+        };
+      })
+    );
+    
+    res.json(enhancedFranchises);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -108,7 +136,33 @@ const getFranchiseById = async (req, res) => {
       return res.status(404).json({ message: 'Franchise not found' });
     }
     
-    res.json(franchise);
+    // Get purchased packages from transactions
+    const Transaction = require('../models/Transaction');
+    const Package = require('../models/Package');
+    
+    const transactions = await Transaction.find({
+      franchiseId: req.params.id,
+      status: 'paid',
+    }).populate('packageId');
+    
+    const purchasedPackages = transactions
+      .filter(transaction => transaction.packageId) // Only valid transactions with package
+      .map(transaction => transaction.packageId);
+    
+    // Combine assigned and purchased packages for the response
+    const allPackages = {
+      assigned: franchise.assignedPackages,
+      purchased: purchasedPackages,
+      all: [...franchise.assignedPackages, ...purchasedPackages]
+    };
+    
+    // Return franchise data with both assigned and purchased packages
+    const responseData = {
+      ...franchise.toObject(),
+      allPackages: allPackages
+    };
+    
+    res.json(responseData);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

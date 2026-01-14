@@ -11,7 +11,8 @@ const {
   getAdminBlogs,
   getBlogCategories,
   getRecentBlogs,
-  getBlogTags
+  getBlogTags,
+  uploadBlogImage
 } = require('../controllers/blogController');   
 
 // Admin routes
@@ -22,6 +23,8 @@ router.route('/admin')
 router.route('/admin/:id')
   .put(auth, rbac('admin'), updateBlog)
   .delete(auth, rbac('admin'), deleteBlog);
+
+router.post('/admin/upload-image', auth, rbac('admin'), uploadBlogImage);
 
 // Public routes
 router.route('/')

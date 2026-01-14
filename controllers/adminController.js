@@ -57,6 +57,53 @@ const getDashboardStats = async (req, res) => {
     
     const totalRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
     
+    // Calculate revenue from franchise packages (regular packages)
+    // Need to ensure these transactions are linked to active franchises/users
+    const franchisePackageRevenueResult = await Transaction.aggregate([
+      { $match: { status: 'paid', packageId: { $exists: true } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: '$user' },
+      { $match: { 'user.isActive': { $ne: false } } }, // Only count revenue from active users
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    
+    const franchisePackageRevenue = franchisePackageRevenueResult.length > 0 ? franchisePackageRevenueResult[0].total : 0;
+    
+    // Calculate revenue from customer packages (business forms)
+    // We need to get the revenue from paid business forms that are linked to existing franchises
+    const paidBusinessForms = await BusinessForm.aggregate([
+      { $match: { paymentStatus: 'paid' } },
+      {
+        $lookup: {
+          from: 'customerpackages',
+          localField: 'selectedPackage',
+          foreignField: '_id',
+          as: 'package'
+        }
+      },
+      { $unwind: '$package' },
+      {
+        $lookup: {
+          from: 'franchises',
+          localField: 'franchiseId',
+          foreignField: '_id',
+          as: 'franchise'
+        }
+      },
+      { $unwind: '$franchise' },
+      { $match: { 'franchise._id': { $exists: true } } }, // Only count revenue from existing franchises
+      { $group: { _id: null, total: { $sum: '$package.price' } } }
+    ]);
+        
+    const customerPackageRevenue = paidBusinessForms.length > 0 ? paidBusinessForms[0].total : 0;
+    
     res.json({
       totalFranchises,
       activeFranchises,
@@ -65,6 +112,8 @@ const getDashboardStats = async (req, res) => {
       totalLeads,
       totalTransactions,
       totalRevenue,
+      franchisePackageRevenue,
+      customerPackageRevenue,
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -309,6 +358,23 @@ const updateLead = async (req, res) => {
     res.json({
       message: 'Lead updated successfully',
       lead,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Delete lead (admin only)
+const deleteLead = async (req, res) => {
+  try {
+    const lead = await Lead.findByIdAndDelete(req.params.id);
+    
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+    
+    res.json({
+      message: 'Lead deleted successfully',
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -1394,6 +1460,7 @@ module.exports = {
   getAllLeads,
   getLeadById,
   updateLead,
+  deleteLead,
   getAllTransactions,
   getTransactionById,
   getAllPayouts,

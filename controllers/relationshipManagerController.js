@@ -141,7 +141,7 @@ const deleteRelationshipManager = async (req, res) => {
       { $unset: { relationshipManager: "" } }
     );
     
-    await relationshipManager.remove();
+    await RelationshipManager.findByIdAndDelete(req.params.id);
     
     res.json({
       message: 'Relationship Manager deleted successfully',

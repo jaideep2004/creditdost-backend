@@ -29,7 +29,7 @@ const digitalAgreementSchema = new mongoose.Schema({
   // Status of the agreement
   status: {
     type: String,
-    enum: ['pending', 'downloaded', 'signed', 'submitted', 'approved', 'rejected'],
+    enum: ['pending', 'downloaded', 'signed', 'completed', 'submitted', 'approved', 'rejected'],
     default: 'pending'
   },
   // Signed PDF file path (after eSign)

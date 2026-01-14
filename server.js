@@ -77,6 +77,17 @@ mongoose
 // Initialize referral settings
 initializeReferralSettings();
 
+// Create uploads directory if it doesn't exist
+const fs = require('fs');
+const uploadsDir = path.join(__dirname, '../uploads');
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('Uploads directory created');
+} else {
+  console.log('Uploads directory already exists');
+}
+
 const app = express();
 
 // Middleware
@@ -86,6 +97,9 @@ app.use(cookieParser());
 
 // Serve static files from the reports directory
 app.use("/reports", express.static(path.join(__dirname, "reports")));
+
+// Serve static files from the uploads directory
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // CORS configuration
 const corsOptions = {
@@ -97,9 +111,9 @@ const corsOptions = {
     const allowedOrigins = [
       process.env.FRONTEND_URL || "http://localhost:5173",
       "https://creditdost.onrender.com",
-      "http://localhost:5000"
+      "http://localhost:5000",
       // Add more origins here as needed
-      // "https://another-domain.com",
+      
     ];
     
     if (allowedOrigins.indexOf(origin) !== -1) {

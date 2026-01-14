@@ -49,7 +49,7 @@ const referralSchema = new mongoose.Schema({
 
 // Method to generate referral link
 referralSchema.methods.getReferralLink = function() {
-  return `${process.env.FRONTEND_URL || 'http://localhost:5173'}/register?ref=${this._id}`;
+  return `${process.env.FRONTEND_URL || 'https://creditdost.onrender.com'}/register?ref=${this._id}`;
 };
 
 module.exports = mongoose.model('Referral', referralSchema);
