@@ -112,7 +112,8 @@ const corsOptions = {
       process.env.FRONTEND_URL || "http://localhost:5173",
       "https://creditdost.onrender.com",
       "http://localhost:5000",
-      // Add more origins here as needed
+      "https://creditdost.co.in",
+      
       
     ];
     
@@ -127,15 +128,16 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
   exposedHeaders: ["Content-Range", "X-Content-Range"],
 };
-
+ 
 app.use(cors(corsOptions));
 
 // Routes
+console.log('Registering API routes...');  
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/franchises", require("./routes/franchises"));
 app.use("/api/kyc", require("./routes/kyc"));
 app.use("/api/packages", require("./routes/packages"));
-app.use("/api/customer-packages", require("./routes/customerPackages"));
+app.use("/api/customer-packages", require("./routes/customerPackages"));  
 app.use("/api/payments", require("./routes/payments"));
 app.use("/api/credit", require("./routes/credit"));
 app.use("/api/leads", require("./routes/leads"));
@@ -150,7 +152,9 @@ app.use("/api/forms", require("./routes/forms"));
 app.use("/api/digital-agreements", require("./routes/digitalAgreements"));
 app.use("/api/careers", require("./routes/careers"));
 app.use("/api/ai-analysis", require("./routes/aiAnalysis"));
+console.log('Registering analytics route...');
 app.use("/api/analytics", require("./routes/analytics"));
+console.log('Analytics route registered');
 
 // Error handling middleware
 app.use(require("./middleware/errorHandler"));

@@ -35,26 +35,26 @@ const getCustomerPackages = async (req, res) => {
       const franchise = await Franchise.findOne({ userId: req.user.id });
 
       if (franchise) {
-        // Get all package IDs that the franchise has access to:
-        // 1. Packages purchased through transactions
-        const transactions = await Transaction.find({
+        // Get the most recent paid transaction to determine current package
+        const latestTransaction = await Transaction.findOne({
           userId: req.user.id,
           status: "paid",
-        }).populate("packageId");
+        })
+        .populate("packageId")
+        .sort({ createdAt: -1 }); // Sort by most recent first
 
-        const purchasedPackageIds = transactions
-          .filter((transaction) => transaction.packageId) // Only valid transactions with package
-          .map((transaction) => transaction.packageId._id.toString());
+        let accessiblePackageIds = [];
 
-        // 2. Packages assigned directly by admin
-        const assignedPackageIds = franchise.assignedPackages.map((pkg) =>
-          pkg.toString()
-        );
-
-        // Combine both sets of package IDs
-        const allAccessiblePackageIds = [
-          ...new Set([...purchasedPackageIds, ...assignedPackageIds]),
-        ];
+        // Use either the purchased package (if exists) or fall back to assigned packages
+        if (latestTransaction && latestTransaction.packageId) {
+          // Use only the most recently purchased package
+          accessiblePackageIds = [latestTransaction.packageId._id.toString()];
+        } else {
+          // Fall back to assigned packages if no purchase history
+          accessiblePackageIds = franchise.assignedPackages.map((pkg) =>
+            pkg.toString()
+          );
+        };
 
         // Filter customer packages based on availableForPackages field
         // If availableForPackages is empty/undefined, it means available to all
@@ -72,15 +72,13 @@ const getCustomerPackages = async (req, res) => {
           );
           // Check if any of the accessible packages match the allowed packages
           return allowedPackageIds.some((allowedPackageId) =>
-            allAccessiblePackageIds.includes(allowedPackageId)
+            accessiblePackageIds.includes(allowedPackageId)
           );
         });
 
         // Log for debugging
         console.log("Franchise ID:", franchise._id);
-        console.log("Purchased Package IDs:", purchasedPackageIds);
-        console.log("Assigned Package IDs:", assignedPackageIds);
-        console.log("All Accessible Package IDs:", allAccessiblePackageIds);
+        console.log("Accessible Package IDs:", accessiblePackageIds);
         console.log("Filtered packages count:", packages.length);
       }
     }

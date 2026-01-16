@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Franchise = require('../models/Franchise');
 
 const auth = async (req, res, next) => {
+  console.log('Auth middleware hit for analytics route');
   try {
     let token;
     
@@ -16,6 +17,7 @@ const auth = async (req, res, next) => {
     }
     
     if (!token) {
+      console.log('No authentication token found, access denied');
       return res.status(401).json({ message: 'No authentication token, access denied' });
     }
     
@@ -23,8 +25,11 @@ const auth = async (req, res, next) => {
     const user = await User.findById(decoded.id).select('-password');
     
     if (!user) {
+      console.log('Token invalid, access denied');
       return res.status(401).json({ message: 'Token invalid, access denied' });
     }
+    
+    console.log('Authenticated user:', user.email, 'Role:', user.role);
     
     // If user is a franchise user, get their franchiseId
     if (user.role === 'franchise_user') {

@@ -116,9 +116,27 @@ const verifyPayment = async (req, res) => {
         franchise.credits += pkg.creditsIncluded;
         franchise.totalCreditsPurchased += pkg.creditsIncluded;
         
-        // Add the purchased package to assigned packages to ensure access to appropriate customer packages
-        const packageIdString = transaction.packageId.toString();
-        if (!franchise.assignedPackages.some(pkg => pkg.toString() === packageIdString)) {
+        // Get all previous paid transactions for this user to identify previously purchased packages
+        const previousTransactions = await Transaction.find({
+          userId: transaction.userId,
+          status: 'paid',
+          _id: { $ne: transaction._id } // Exclude current transaction
+        }).populate('packageId');
+        
+        // Identify package IDs that were added due to previous purchases
+        const previouslyPurchasedPackageIds = previousTransactions
+          .filter(tx => tx.packageId) // Only transactions with packages
+          .map(tx => tx.packageId._id.toString());
+        
+        // Filter out previously purchased packages from assignedPackages
+        // This prevents accumulation of old purchased packages when upgrading
+        franchise.assignedPackages = franchise.assignedPackages.filter(
+          pkg => !previouslyPurchasedPackageIds.includes(pkg.toString())
+        );
+        
+        // Add the newly purchased package
+        const newPackageIdString = transaction.packageId.toString();
+        if (!franchise.assignedPackages.some(pkg => pkg.toString() === newPackageIdString)) {
           franchise.assignedPackages.push(transaction.packageId);
         }
         
