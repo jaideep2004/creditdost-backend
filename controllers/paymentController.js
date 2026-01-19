@@ -113,6 +113,9 @@ const verifyPayment = async (req, res) => {
     if (franchise) {
       const pkg = await Package.findById(transaction.packageId);
       if (pkg) {
+        // Get the previous package before updating
+        const previousPackageIds = [...franchise.assignedPackages];
+        
         franchise.credits += pkg.creditsIncluded;
         franchise.totalCreditsPurchased += pkg.creditsIncluded;
         
@@ -154,6 +157,47 @@ const verifyPayment = async (req, res) => {
           });
         } catch (agreementError) {
           console.error('Failed to update digital agreement with package details:', agreementError);
+        }
+        
+        // Check if this is a package upgrade (user had previous packages)
+        if (previousPackageIds.length > 0) {
+          // Get the previous package that was replaced
+          const previousPackage = await Package.findById(previousPackageIds[0]); // Assuming single package at a time
+          
+          // Add to package history
+          franchise.packageHistory.push({
+            packageName: pkg.name,
+            packageId: pkg._id,
+            price: pkg.price,
+            creditsIncluded: pkg.creditsIncluded,
+            upgradeDate: new Date(),
+            transactionId: transaction._id
+          });
+          
+          // Save the updated franchise with package history
+          await franchise.save();
+          
+          // Send package upgrade notification
+          try {
+            const { sendPackageUpgradeNotification } = require('../utils/emailService');
+            const user = await User.findById(transaction.userId);
+            await sendPackageUpgradeNotification(user, franchise, previousPackage, pkg, transaction);
+          } catch (notificationError) {
+            console.error('Failed to send package upgrade notification:', notificationError);
+          }
+        } else {
+          // For first-time package purchase, add to package history
+          franchise.packageHistory.push({
+            packageName: pkg.name,
+            packageId: pkg._id,
+            price: pkg.price,
+            creditsIncluded: pkg.creditsIncluded,
+            upgradeDate: new Date(),
+            transactionId: transaction._id
+          });
+          
+          // Save the updated franchise with package history
+          await franchise.save();
         }
       }
     }

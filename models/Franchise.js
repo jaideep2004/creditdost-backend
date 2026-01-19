@@ -102,6 +102,25 @@ const franchiseSchema = new mongoose.Schema({
   bankDetails: {
     type: mongoose.Schema.Types.Mixed, // Store full bank verification response
   },
+  
+  // Package upgrade history
+  packageHistory: [{
+    packageName: String,
+    packageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Package'
+    },
+    price: Number,
+    creditsIncluded: Number,
+    upgradeDate: {
+      type: Date,
+      default: Date.now
+    },
+    transactionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Transaction'
+    }
+  }],
 }, {
   timestamps: true,
 });

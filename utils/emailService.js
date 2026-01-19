@@ -579,6 +579,62 @@ const sendPasswordResetEmail = async (user, resetToken) => {
   return transporter.sendMail(mailOptions);
 };
 
+// Send package upgrade notification email to both franchise user and admin
+const sendPackageUpgradeNotification = async (user, franchise, oldPackage, newPackage, transaction) => {
+  // Send email to franchise user
+  try {
+    const franchiseMailOptions = {
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'Package Upgrade Successful - CreditDost Franchise Platform',
+      html: `
+        <h2>Package Upgrade Successful!</h2>
+        <p>Hello ${user.name},</p>
+        <p>Your package has been successfully upgraded from <strong>${oldPackage?.name || 'N/A'}</strong> to <strong>${newPackage.name}</strong>.</p>
+        <p><strong>Upgrade Details:</strong></p>
+        <ul>
+          <li><strong>Previous Package:</strong> ${oldPackage?.name || 'N/A'}</li>
+          <li><strong>New Package:</strong> ${newPackage.name}</li>
+          <li><strong>Amount Paid:</strong> ₹${transaction.amount}</li>
+          <li><strong>Credits Added:</strong> ${newPackage.creditsIncluded}</li>
+          <li><strong>Total Credits Now:</strong> ${franchise.credits}</li>
+        </ul>
+        <p>Your upgraded package is now active and ready to use.</p>
+        <p>Best regards,<br>The CreditDost Team</p>
+      `,
+    };
+    
+    await transporter.sendMail(franchiseMailOptions);
+  } catch (error) {
+    console.error('Error sending package upgrade notification to franchise user:', error);
+  }
+  
+  // Send email to admin
+  try {
+    const adminMailOptions = {
+      from: process.env.EMAIL_USER,
+      to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
+      subject: 'Package Upgrade Notification - CreditDost Platform',
+      html: `
+        <h2>Package Upgrade Notification</h2>
+        <p>A franchise user has upgraded their package:</p>
+        <p><strong>User:</strong> ${user.name}</p>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Franchise:</strong> ${franchise.businessName || 'N/A'}</p>
+        <p><strong>Previous Package:</strong> ${oldPackage?.name || 'N/A'}</p>
+        <p><strong>New Package:</strong> ${newPackage.name}</p>
+        <p><strong>Amount Paid:</strong> ₹${transaction.amount}</p>
+        <p><strong>Transaction ID:</strong> ${transaction._id}</p>
+        <p>Best regards,<br>The CreditDost System</p>
+      `,
+    };
+    
+    await transporter.sendMail(adminMailOptions);
+  } catch (error) {
+    console.error('Error sending package upgrade notification to admin:', error);
+  }
+};
+
 module.exports = {
   sendJobApplicationEmail,
   sendRegistrationEmail,
@@ -601,5 +657,6 @@ module.exports = {
   sendSuvidhaCentreApplicationEmail,
   sendPasswordResetEmail,
   sendAIAnalysisNotificationToAdmin,
-  sendAIAnalysisResponseToFranchise
+  sendAIAnalysisResponseToFranchise,
+  sendPackageUpgradeNotification
 };

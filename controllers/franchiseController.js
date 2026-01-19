@@ -114,7 +114,8 @@ const getAllFranchises = async (req, res) => {
         // Return franchise data with both assigned and purchased packages
         return {
           ...franchise.toObject(),
-          allPackages: allPackages
+          allPackages: allPackages,
+          packageHistory: franchise.packageHistory || []
         };
       })
     );
@@ -156,10 +157,11 @@ const getFranchiseById = async (req, res) => {
       all: [...franchise.assignedPackages, ...purchasedPackages]
     };
     
-    // Return franchise data with both assigned and purchased packages
+    // Include package history in the response
     const responseData = {
       ...franchise.toObject(),
-      allPackages: allPackages
+      allPackages: allPackages,
+      packageHistory: franchise.packageHistory || []
     };
     
     res.json(responseData);
