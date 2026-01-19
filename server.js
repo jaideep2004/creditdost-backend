@@ -111,7 +111,7 @@ const corsOptions = {
     const allowedOrigins = [
       process.env.FRONTEND_URL || "http://localhost:5173",
       "https://creditdost.onrender.com",
-      "https://reactbackend.creditdostlearning.com",
+      "http://localhost:5000",
       "https://creditdost.co.in",
       
     ];
@@ -131,6 +131,16 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Routes
+// Root route to indicate server is running
+app.get("/", (req, res) => {
+  const port = process.env.PORT || 5000;
+  res.status(200).json({
+    message: `Server running on port ${port}`,
+    status: "success",
+    timestamp: new Date().toISOString()
+  });
+});
+
 console.log('Registering API routes...');  
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/franchises", require("./routes/franchises"));
