@@ -11,6 +11,8 @@ const {
   sendFranchiseOpportunityEmail,
   sendBusinessFormSubmissionEmail,
   sendSuvidhaCentreApplicationEmail,
+  sendCreditRepairFormEmail,
+  sendApplyForLoanFormEmail,
 } = require("../utils/emailService");
 
 // Validation schema for credit repair form
@@ -79,6 +81,7 @@ const businessFormSchema = Joi.object({
   creditScore: Joi.string().optional(),
   loanAmount: Joi.string().optional(),
   loanPurpose: Joi.string().optional(),
+  message: Joi.string().optional(),
   selectedPackage: Joi.any().optional(),
 }).options({ stripUnknown: true });
 
@@ -149,6 +152,14 @@ const submitCreditRepairForm = async (req, res) => {
       income,
     });
     await creditRepair.save();
+
+    // Send email to admin
+    try {
+      await sendCreditRepairFormEmail(creditRepair);
+    } catch (emailError) {
+      console.error("Failed to send credit repair form email to admin:", emailError);
+      // Don't fail the request if email sending fails
+    }
 
     // Sync with Google Sheets
     try {
@@ -339,6 +350,7 @@ const submitBusinessForm = async (req, res) => {
       creditScore,
       loanAmount,
       loanPurpose,
+      message,
       selectedPackage,
     } = req.body;
 
@@ -361,6 +373,7 @@ const submitBusinessForm = async (req, res) => {
       creditScore,
       loanAmount,
       loanPurpose,
+      message,
       selectedPackage: selectedPackage || undefined,
     });
 
@@ -368,18 +381,10 @@ const submitBusinessForm = async (req, res) => {
 
     // Send email to admin
     try {
-      // Get admin users
-      const adminUsers = await User.find({ role: "admin" });
-
-      // Send email to all admins
-      for (const admin of adminUsers) {
-        if (admin && admin.email) {
-          await sendBusinessFormSubmissionEmail(admin, businessForm, null);
-        }
-      }
+      await sendApplyForLoanFormEmail(businessForm);
     } catch (emailError) {
       console.error(
-        "Failed to send business form submission email:",
+        "Failed to send apply for loan form submission email:",
         emailError
       );
       // Don't fail the request if email sending fails

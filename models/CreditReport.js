@@ -64,6 +64,18 @@ const creditReportSchema = new mongoose.Schema({
     type: String,
     required: false, // Make optional for backward compatibility
   },
+  occupation: {
+    type: String,
+  },
+  city: {
+    type: String,
+  },
+  state: {
+    type: String,
+  },
+  language: {
+    type: String,
+  },
 }, {
   timestamps: true,
 });

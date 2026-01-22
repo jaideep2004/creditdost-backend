@@ -304,10 +304,10 @@ exports.getRecentBlogs = async (req, res) => {
 // @access  Private/Admin
 exports.uploadBlogImage = async (req, res) => {
   try {
-    const upload = require('../utils/fileUpload').upload;
+    const { uploadBlogImage } = require('../utils/fileUpload');
     
-    // Use the same upload middleware as in fileUpload.js
-    const imageUpload = upload.single('image');
+    // Use the dedicated blog image upload middleware
+    const imageUpload = uploadBlogImage.single('image');
     
     imageUpload(req, res, async (err) => {
       if (err) {
@@ -324,7 +324,20 @@ exports.uploadBlogImage = async (req, res) => {
         // Normalize the path to use forward slashes
         const normalizedPath = req.file.path.replace(/\\/g, '/');
         
-        // Check if the file is in the uploads directory regardless of absolute or relative path
+        // Check if the file is in the Backend uploads directory
+        if (normalizedPath.includes('Backend/uploads/')) {
+          // Extract just the filename from the full path
+          const fileName = req.file.path.split(/[\\/]/).pop();
+          const imageUrl = `${req.protocol}://${req.get('host')}/backend-uploads/${fileName}`;
+          
+          return res.json({ 
+            imageUrl: imageUrl,
+            fileName: fileName,
+            originalName: req.file.originalname
+          });
+        }
+        
+        // Also check for root uploads directory (backward compatibility)
         if (normalizedPath.includes('uploads/')) {
           // Extract just the filename from the full path
           const fileName = req.file.path.split(/[\\/]/).pop();
@@ -341,7 +354,10 @@ exports.uploadBlogImage = async (req, res) => {
       // For production, normalize the path and return the correct URL
       // Extract just the filename from the full path
       const fileName = req.file.path.split(/[\\/]/).pop();
-      const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${fileName}`;
+      // Check if file is in Backend/uploads, otherwise use root uploads
+      const isBackendUpload = req.file.path.includes('Backend') || req.file.path.includes('backend');
+      const baseUrl = isBackendUpload ? '/backend-uploads/' : '/uploads/';
+      const imageUrl = `${req.protocol}://${req.get('host')}${baseUrl}${fileName}`;
       
       res.json({ 
         imageUrl: imageUrl,

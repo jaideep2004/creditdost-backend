@@ -85,6 +85,7 @@ const submitBusinessForm = async (req, res) => {
     const { 
       customerName, customerEmail, customerPhone, panNumber, aadharNumber,
       pincode, state, language, occupation, monthlyIncome, fullAddress,
+      whatsappNumber, creditScore, loanAmount, loanPurpose, message,
       selectedPackage
     } = req.body;
     
@@ -114,6 +115,11 @@ const submitBusinessForm = async (req, res) => {
       occupation,
       monthlyIncome,
       fullAddress,
+      whatsappNumber,
+      creditScore,
+      loanAmount,
+      loanPurpose,
+      message,
       selectedPackage,
     });
     

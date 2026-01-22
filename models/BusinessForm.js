@@ -96,6 +96,10 @@ const businessFormSchema = new mongoose.Schema({
   razorpaySignature: {
     type: String,
   },
+  message: {
+    type: String,
+    required: false,
+  },
 }, {
   timestamps: true,
 });

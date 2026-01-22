@@ -77,15 +77,25 @@ mongoose
 // Initialize referral settings
 initializeReferralSettings();
 
-// Create uploads directory if it doesn't exist
+// Create uploads directories if they don't exist
 const fs = require('fs');
-const uploadsDir = path.join(__dirname, '../uploads');
 
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true }); 
-  console.log('Uploads directory created');
+// Root uploads directory
+const rootUploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(rootUploadsDir)) {
+  fs.mkdirSync(rootUploadsDir, { recursive: true }); 
+  console.log('Root uploads directory created');
 } else {
-  console.log('Uploads directory already exists');
+  console.log('Root uploads directory already exists');
+}
+
+// Backend uploads directory
+const backendUploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(backendUploadsDir)) {
+  fs.mkdirSync(backendUploadsDir, { recursive: true }); 
+  console.log('Backend uploads directory created');
+} else {
+  console.log('Backend uploads directory already exists');
 }
 
 const app = express();
@@ -98,8 +108,11 @@ app.use(cookieParser());
 // Serve static files from the reports directory
 app.use("/reports", express.static(path.join(__dirname, "reports")));
 
-// Serve static files from the uploads directory
+// Serve static files from the root uploads directory
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// Serve static files from the Backend uploads directory
+app.use("/backend-uploads", express.static(path.join(__dirname, "uploads")));
 
 // CORS configuration
 const corsOptions = {

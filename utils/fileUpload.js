@@ -18,12 +18,33 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
+// File filter specifically for blog images - allow only image files
+const blogImageFilter = (req, file, cb) => {
+  // Accept only image files for blog images (case-insensitive)
+  if (!file.originalname.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+    return cb(new Error('Only image files are allowed for blog images!'), false);
+  }
+  cb(null, true);
+};
+
 const path = require('path');
 
-// Storage configuration for local development
+// Storage configuration for local development 
 const localStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.join(__dirname, '../../uploads/'));
+  },
+  filename: (req, file, cb) => {
+    // Replace spaces and special characters in filenames to prevent URL issues
+    const cleanFilename = file.originalname.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+    cb(null, Date.now() + '-' + cleanFilename);
+  },
+});
+
+// Storage configuration for blog images in Backend/uploads folder
+const blogImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '../uploads/')); // Save in Backend/uploads folder
   },
   filename: (req, file, cb) => {
     // Replace spaces and special characters in filenames to prevent URL issues
@@ -56,6 +77,15 @@ const upload = multer({
   },
 });
 
+// Multer upload configuration for blog images
+const uploadBlogImage = multer({
+  storage: blogImageStorage,
+  fileFilter: blogImageFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+});
+
 // Virus scan placeholder function
 const virusScan = async (file) => {
   // In a real implementation, you would integrate with a virus scanning service
@@ -66,5 +96,6 @@ const virusScan = async (file) => {
 
 module.exports = {
   upload,
+  uploadBlogImage,
   virusScan,
 };

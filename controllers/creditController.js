@@ -38,6 +38,10 @@ const creditCheckSchema = Joi.object({
   aadhaar: Joi.string().optional(),
   dob: Joi.date().optional(),
   gender: Joi.string().optional(),
+  occupation: Joi.string().optional(),
+  city: Joi.string().optional(),
+  state: Joi.string().optional(),
+  language: Joi.string().optional(),
 });
 
 // Helper function to get Surepass API key value directly
@@ -383,6 +387,10 @@ const checkCreditScorePublic = async (req, res) => {
       aadhaar,
       dob,
       gender,
+      occupation,
+      city,
+      state,
+      language,
     } = req.body;
 
     // Only allow Experian for public access
@@ -494,9 +502,21 @@ const checkCreditScorePublic = async (req, res) => {
       reportData: response.data,
       reportUrl: reportUrl,
       isPublic: true, // Mark as public report
+      occupation,
+      city,
+      state,
+      language,
     });
 
     await creditReport.save();
+
+    // Sync with Google Sheets for public reports
+    try {
+      await googleSheetsService.initialize();
+      await googleSheetsService.syncPublicCreditScoreData();
+    } catch (syncError) {
+      console.error('Failed to sync public credit score data with Google Sheets:', syncError);
+    }
 
     // Send email to user and admin
     try {

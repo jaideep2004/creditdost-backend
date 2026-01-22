@@ -92,6 +92,7 @@ class GoogleSheetsService {
       console.log('Creating required tabs for spreadsheet:', spreadsheetId);
       const requiredTabs = [
         'Credit Score',
+        'Website Credit Reports',
         'Apply for Loan',
         'Credit Score Repair',
         'Contact Us',
@@ -202,8 +203,8 @@ class GoogleSheetsService {
         return { success: false, message: 'Failed to create required tabs' };
       }
 
-      // Get credit reports from database
-      const creditReports = await CreditReport.find({}).populate('userId', 'name email').sort({ createdAt: -1 });
+      // Get credit reports from database (excluding public reports)
+      const creditReports = await CreditReport.find({ isPublic: { $ne: true } }).populate('userId', 'name email').sort({ createdAt: -1 });
       console.log('Found credit reports:', creditReports.length);
 
       // Format data for Google Sheets
@@ -276,7 +277,7 @@ class GoogleSheetsService {
 
       // Format data for Google Sheets
       const rows = [
-        ['Customer Name', 'Customer Email', 'Customer Phone', 'WhatsApp Number', 'PAN Number', 'Aadhar Number', 'City', 'State', 'Pincode', 'Occupation', 'Monthly Income', 'Credit Score', 'Loan Amount', 'Loan Purpose', 'Date'], // Header row
+        ['Customer Name', 'Customer Email', 'Customer Phone', 'WhatsApp Number', 'PAN Number', 'Aadhar Number', 'City', 'State', 'Pincode', 'Occupation', 'Monthly Income', 'Credit Score', 'Loan Amount', 'Loan Purpose', 'Message', 'Date'], // Header row
         ...businessForms.map(form => [
           form.customerName,
           form.customerEmail,
@@ -292,6 +293,7 @@ class GoogleSheetsService {
           form.creditScore || '',
           form.loanAmount || '',
           form.loanPurpose || '',
+          form.message || '',
           form.createdAt.toISOString().split('T')[0]
         ])
       ];
@@ -299,7 +301,7 @@ class GoogleSheetsService {
       // Update Google Sheet
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: settings.spreadsheetId,
-        range: `Apply for Loan!A1:O${rows.length}`,
+        range: `Apply for Loan!A1:P${rows.length}`,
         valueInputOption: 'RAW',
         resource: {
           values: rows
@@ -345,7 +347,7 @@ class GoogleSheetsService {
 
       // Format data for Google Sheets
       const rows = [
-        ['Full Name', 'Email', 'Mobile Number', 'City', 'State', 'Problem Type', 'Credit Score', 'Message', 'Date'], // Header row
+        ['Full Name', 'Email', 'Mobile Number', 'City', 'State', 'Problem Type', 'Credit Score', 'Message', 'Language', 'Occupation', 'Income', 'Date'], // Header row
         ...creditRepairData.map(item => [
           item.fullName,
           item.email,
@@ -355,6 +357,9 @@ class GoogleSheetsService {
           item.problemType || '',
           item.creditScore || '',
           item.message || '',
+          item.language || '',
+          item.occupation || '',
+          item.income || '',
           item.createdAt ? item.createdAt.toISOString().split('T')[0] : ''
         ])
       ];
@@ -506,11 +511,73 @@ class GoogleSheetsService {
     }
   }
 
+  // Sync public credit score data to Google Sheets
+  async syncPublicCreditScoreData() {
+    try {
+      console.log('Starting public credit score data sync');
+      const settings = await GoogleSheet.findOne({ isActive: true });
+      if (!settings || !settings.spreadsheetId) {
+        console.log('Google Sheets integration not configured');
+        return { success: false, message: 'Google Sheets integration not configured' };
+      }
+
+      // Create required tabs if they don't exist
+      const tabsCreated = await this.createRequiredTabs(settings.spreadsheetId);
+      if (!tabsCreated) {
+        console.log('Failed to create required tabs, aborting sync');
+        return { success: false, message: 'Failed to create required tabs' };
+      }
+
+      // Get public credit reports from database
+      const creditReports = await CreditReport.find({ isPublic: true }).sort({ createdAt: -1 });
+      console.log('Found public credit reports:', creditReports.length);
+
+      // Format data for Google Sheets
+      const rows = [
+        ['Name', 'Email', 'Phone', 'Credit Score', 'Occupation', 'City', 'State', 'Language', 'Date'], // Header row
+        ...creditReports.map(report => [
+          report.name,
+          report.email || '',
+          report.mobile || '',
+          report.score ? report.score.toString() : '',
+          report.occupation || '',
+          report.city || '',
+          report.state || '',
+          report.language || '',
+          report.createdAt.toISOString().split('T')[0]
+        ])
+      ];
+
+      console.log('Updating Google Sheet with', rows.length, 'rows');
+
+      // Update Google Sheet
+      console.log('Updating spreadsheet:', settings.spreadsheetId, 'range:', `Website Credit Reports!A1:I${rows.length}`);
+      const updateResult = await this.sheets.spreadsheets.values.update({
+        spreadsheetId: settings.spreadsheetId,
+        range: `Website Credit Reports!A1:I${rows.length}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: rows
+        }
+      });
+      console.log('Update result:', !!updateResult);
+
+      console.log('Public credit score Google Sheet updated successfully');
+
+      return { success: true, count: creditReports.length };
+    } catch (error) {
+      console.error('Failed to sync public credit score data:', error);
+      console.error('Public credit score sync error details:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Sync all data to Google Sheets
   async syncAllData() {
     console.log('Starting sync of all data');
     const results = {
       creditScore: await this.syncCreditScoreData(),
+      publicCreditScore: await this.syncPublicCreditScoreData(),
       businessForm: await this.syncBusinessFormData(),
       creditRepair: await this.syncCreditRepairData(),
       contactForm: await this.syncContactFormData(),
