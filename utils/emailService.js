@@ -25,7 +25,7 @@ transporter.verify((error, success) => {
 // Send registration email to user
 const sendRegistrationEmail = async (user) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: user.email,
     subject: 'Welcome to CreditDost Franchise Platform',
     html: `
@@ -44,7 +44,7 @@ const sendRegistrationEmail = async (user) => {
 // Send registration notification email to admin
 const sendAdminNotificationEmail = async (user, options = {}) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Fallback to EMAIL_USER if ADMIN_EMAIL not set
     subject: options.subject || 'New Franchise Registration - CreditDost Platform',
     html: options.html || `
@@ -66,7 +66,7 @@ const sendAdminNotificationEmail = async (user, options = {}) => {
 // Send self-registration welcome email
 const sendSelfRegistrationEmail = async (user, franchise) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: user.email,
     subject: 'Welcome to CreditDost Franchise Platform',
     html: `
@@ -94,7 +94,7 @@ const sendRegistrationApprovalEmail = async (user, franchise, password) => {
     }
     
     const mailOptions = {
-      from: '"CreditDost Info" <info@creditdost.co.in>',
+      from: '"CreditDost Support" <support@creditdost.co.in> ',
       to: user.email,
       subject: 'Registration Approved - CreditDost Franchise Platform',
       html: `
@@ -126,7 +126,7 @@ const sendRegistrationApprovalEmail = async (user, franchise, password) => {
 // Send registration rejection email
 const sendRegistrationRejectionEmail = async (user, franchise, reason) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: user.email,
     subject: 'Registration Review - CreditDost Franchise Platform',
     html: `
@@ -145,7 +145,7 @@ const sendRegistrationRejectionEmail = async (user, franchise, reason) => {
 // Send KYC approval email
 const sendKycApprovalEmail = async (user, franchise) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: user.email,
     subject: 'KYC Approved - CreditDost Franchise Platform',
     html: `
@@ -164,7 +164,7 @@ const sendKycApprovalEmail = async (user, franchise) => {
 // Send KYC rejection email
 const sendKycRejectionEmail = async (user, franchise, reason) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: user.email,
     subject: 'KYC Review - CreditDost Franchise Platform',
     html: `
@@ -184,7 +184,7 @@ const sendKycRejectionEmail = async (user, franchise, reason) => {
 const sendAccountCredentialsEmail = async (user, password) => {
   try {
     const mailOptions = {
-      from: '"CreditDost Info" <info@creditdost.co.in>',
+      from: '"CreditDost Support" <support@creditdost.co.in> ',
       to: user.email,
       subject: 'Your CreditDost Account Credentials',
       html: `
@@ -213,7 +213,7 @@ const sendAccountCredentialsEmail = async (user, password) => {
 // Send payment success email
 const sendPaymentSuccessEmail = async (user, transaction, pkg) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: user.email,
     subject: 'Payment Successful - CreditDost Franchise Platform',
     html: `
@@ -234,7 +234,7 @@ const sendPaymentSuccessEmail = async (user, transaction, pkg) => {
 // Send lead assignment email to franchise user
 const sendLeadAssignmentEmail = async (franchiseUser, lead, adminUser) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: franchiseUser.email,
     subject: 'New Lead Assigned - CreditDost Platform',
     html: `
@@ -257,7 +257,7 @@ const sendLeadAssignmentEmail = async (franchiseUser, lead, adminUser) => {
 // Send lead approval email to admin
 const sendLeadApprovalEmail = async (adminUser, lead, franchiseUser) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: adminUser.email,
     subject: 'Lead Approved - CreditDost Platform',
     html: `
@@ -281,7 +281,7 @@ const sendLeadApprovalEmail = async (adminUser, lead, franchiseUser) => {
 // Send lead rejection email to admin
 const sendLeadRejectionEmail = async (adminUser, lead, franchiseUser, reason) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: adminUser.email,
     subject: 'Lead Rejected - CreditDost Platform',
     html: `
@@ -306,7 +306,7 @@ const sendLeadRejectionEmail = async (adminUser, lead, franchiseUser, reason) =>
 // Send business form submission email
 const sendBusinessFormSubmissionEmail = async (recipient, businessForm, franchise) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: recipient.email,
     subject: 'New Business Form Submission - CreditDost Platform',
     html: `
@@ -336,7 +336,7 @@ const sendReferralEmail = async (referral, referrerFranchise) => {
   const referralLink = referral.getReferralLink();
   
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: referral.referredEmail,
     subject: 'Franchise Opportunity - CreditDost Platform',
     html: `
@@ -370,7 +370,7 @@ const sendCreditReportEmail = async (recipient, creditReport, reportUrl) => {
   }
 
   const mailOptions = {
-    from: '"CreditDost" <info@creditdost.co.in>',
+    from: '"CreditDost" <support@creditdost.co.in> ',
     to: recipient.email,
     subject: `Your Experian Credit Report - CreditDost`,
     html: `
@@ -398,7 +398,7 @@ const sendCreditReportEmail = async (recipient, creditReport, reportUrl) => {
 // Send contact form submission email to admin
 const sendContactFormEmail = async (contactForm) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Send to admin email or fallback to sender email
     subject: `New Contact Form Submission - CreditDost`,
     html: `
@@ -420,7 +420,7 @@ const sendContactFormEmail = async (contactForm) => {
 // Send apply for loan form submission email to admin
 const sendApplyForLoanFormEmail = async (businessForm) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Send to admin email or fallback to sender email
     subject: `New Apply for Loan Form Submission - CreditDost`,
     html: `
@@ -452,7 +452,7 @@ const sendApplyForLoanFormEmail = async (businessForm) => {
 // Send credit repair form submission email to admin
 const sendCreditRepairFormEmail = async (creditRepair) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Send to admin email or fallback to sender email
     subject: `New Credit Repair Form Submission - CreditDost`,
     html: `
@@ -480,7 +480,7 @@ const sendCreditRepairFormEmail = async (creditRepair) => {
 // Send franchise opportunity form submission email to admin
 const sendFranchiseOpportunityEmail = async (franchiseOpportunity) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Send to admin email or fallback to sender email
     subject: `New Franchise Opportunity Submission - CreditDost`,
     html: `
@@ -505,7 +505,7 @@ const sendFranchiseOpportunityEmail = async (franchiseOpportunity) => {
 // Send suvidha centre application form submission email to admin
 const sendSuvidhaCentreApplicationEmail = async (suvidhaCentreApplication) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, // Send to admin email or fallback to sender email
     subject: `New Suvidha Centre Application - CreditDost`,
     html: `
@@ -534,7 +534,7 @@ const sendSuvidhaCentreApplicationEmail = async (suvidhaCentreApplication) => {
 // Send job application email
 const sendJobApplicationEmail = async (applicationData, resumeBuffer) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: process.env.JOB_APPLICATION_EMAIL || process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
     subject: `Job Application: ${applicationData.position} - ${applicationData.name}`,
     html: `
@@ -564,7 +564,7 @@ const sendAIAnalysisNotificationToAdmin = async (franchise, documentName, docume
   if (!adminEmail) return;
 
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: adminEmail,
     subject: 'New AI Analysis Document Uploaded - CreditDost',
     html: `
@@ -592,7 +592,7 @@ const sendAIAnalysisNotificationToAdmin = async (franchise, documentName, docume
 // Send AI Analysis response notification to franchise
 const sendAIAnalysisResponseToFranchise = async (franchise, documentName, documentBuffer) => {
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: franchise.email,
     subject: 'AI Analysis Response - CreditDost',
     html: `
@@ -621,7 +621,7 @@ const sendPasswordResetEmail = async (user, resetToken) => {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
   
   const mailOptions = {
-    from: '"CreditDost Info" <info@creditdost.co.in>',
+    from: '"CreditDost Support" <support@creditdost.co.in> ',
     to: user.email,
     subject: 'Password Reset Request - CreditDost',
     html: `
@@ -644,7 +644,7 @@ const sendPackageUpgradeNotification = async (user, franchise, oldPackage, newPa
   // Send email to franchise user
   try {
     const franchiseMailOptions = {
-      from: '"CreditDost Info" <info@creditdost.co.in>',
+      from: '"CreditDost Support" <support@creditdost.co.in> ',
       to: user.email,
       subject: 'Package Upgrade Successful - CreditDost Franchise Platform',
       html: `
@@ -672,7 +672,7 @@ const sendPackageUpgradeNotification = async (user, franchise, oldPackage, newPa
   // Send email to admin
   try {
     const adminMailOptions = {
-      from: '"CreditDost Info" <info@creditdost.co.in>',
+      from: '"CreditDost Support" <support@creditdost.co.in> ',
       to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
       subject: 'Package Upgrade Notification - CreditDost Platform',
       html: `

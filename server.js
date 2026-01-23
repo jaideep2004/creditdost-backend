@@ -126,6 +126,7 @@ const corsOptions = {
       "https://creditdost.onrender.com",
       "http://localhost:5000",
       "https://creditdost.co.in",
+      "http://localhost:5000"
       
     ];
     
