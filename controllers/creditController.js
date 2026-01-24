@@ -34,6 +34,7 @@ const creditCheckSchema = Joi.object({
     .messages({
       'any.only': 'Please select a valid credit bureau (equifax, experian, cibil, crif)'
     }),
+  // Fields for all bureaus
   pan: Joi.string().optional(),
   aadhaar: Joi.string().optional(),
   dob: Joi.date().optional(),
@@ -42,6 +43,25 @@ const creditCheckSchema = Joi.object({
   city: Joi.string().optional(),
   state: Joi.string().optional(),
   language: Joi.string().optional(),
+  // Equifax specific fields
+  id_number: Joi.string().optional(),
+  id_type: Joi.string().valid('pan', 'aadhaar').optional(),
+})
+// Custom validation for Equifax - requires either pan/aadhaar or id_number/id_type
+.custom((value, helpers) => {
+  if (value.bureau === 'equifax') {
+    // Either provide traditional identification (pan or aadhaar)
+    // OR provide Equifax-specific identification (id_number and id_type)
+    const hasTraditionalId = value.pan || value.aadhaar;
+    const hasEquifaxSpecificId = value.id_number && value.id_type;
+    
+    if (!hasTraditionalId && !hasEquifaxSpecificId) {
+      return helpers.error('any.custom', { 
+        message: 'For Equifax bureau, either PAN/Aadhaar must be provided or id_number and id_type must be provided' 
+      });
+    }
+  }
+  return value;
 });
 
 // Helper function to get Surepass API key value directly
@@ -126,16 +146,29 @@ const getBureauConfig = (bureau) => {
       }),
     },
     equifax: {
-      endpoint: "https://kyc-api.surepass.io/api/v1/crs/fetch-pdf-report",
-      formatData: (data) => ({
-        name: data.name,
-        mobile: data.mobile,
-        person_id: data.personId,
-        pan: data.pan,
-        aadhaar: data.aadhaar,
-        dob: data.dob,
-        gender: data.gender,
-      }),
+      endpoint: "https://kyc-api.surepass.io/api/v1/credit-report-v2/fetch-pdf-report",
+      formatData: (data) => {
+        // If id_number and id_type are provided directly (from frontend), use them
+        // Otherwise, fall back to the traditional method of using pan or aadhaar
+        if (data.id_number && data.id_type) {
+          return {
+            name: data.name,
+            id_number: data.id_number,
+            id_type: data.id_type,
+            mobile: data.mobile,
+            consent: "Y",
+          };
+        } else {
+          // Fallback to traditional method
+          return {
+            name: data.name,
+            id_number: data.pan || data.aadhaar,
+            id_type: data.pan ? "pan" : "aadhaar",
+            mobile: data.mobile,
+            consent: "Y",
+          };
+        }
+      },
     },
   };
   return configs[bureau] || configs.cibil;
@@ -198,6 +231,9 @@ const checkCreditScore = async (req, res) => {
       aadhaar,
       dob,
       gender,
+      // Pass through Equifax-specific fields if provided
+      id_number: req.body.id_number || null,
+      id_type: req.body.id_type || null,
     });
 
     // Make request to Surepass API with timeout and better error handling
@@ -516,6 +552,47 @@ const checkCreditScorePublic = async (req, res) => {
       await googleSheetsService.syncPublicCreditScoreData();
     } catch (syncError) {
       console.error('Failed to sync public credit score data with Google Sheets:', syncError);
+    }
+
+    // If we have a report URL, download and save the PDF locally (for public reports too)
+    if (reportUrl) {
+      try {
+        // Create reports directory if it doesn't exist
+        const reportsDir = path.join(__dirname, "../reports");
+        if (!fs.existsSync(reportsDir)) {
+          fs.mkdirSync(reportsDir, { recursive: true });
+        }
+
+        // Generate a unique filename
+        const timestamp = Date.now();
+        const filename = `credit_report_${creditReport._id}_${timestamp}.pdf`;
+        const localPath = path.join(reportsDir, filename);
+
+        // Download the PDF with timeout
+        const pdfResponse = await axios({
+          method: "GET",
+          url: reportUrl,
+          responseType: "stream",
+          timeout: 30000, // 30 second timeout
+        });
+
+        // Save the PDF to local storage
+        const writer = fs.createWriteStream(localPath);
+        pdfResponse.data.pipe(writer);
+
+        // Wait for the download to complete
+        await new Promise((resolve, reject) => {
+          writer.on("finish", resolve);
+          writer.on("error", reject);
+        });
+
+        // Update the credit report with the local path
+        creditReport.localPath = `/reports/${filename}`;
+        await creditReport.save();
+      } catch (downloadError) {
+        console.error("Error downloading PDF:", downloadError);
+        // We don't fail the entire request if PDF download fails
+      }
     }
 
     // Send email to user and admin

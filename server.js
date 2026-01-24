@@ -98,6 +98,15 @@ if (!fs.existsSync(backendUploadsDir)) {
   console.log('Backend uploads directory already exists');
 }
 
+// Backend reports directory
+const reportsDir = path.join(__dirname, 'reports');
+if (!fs.existsSync(reportsDir)) {
+  fs.mkdirSync(reportsDir, { recursive: true }); 
+  console.log('Reports directory created');
+} else {
+  console.log('Reports directory already exists');
+}
+
 const app = express();
 
 // Middleware

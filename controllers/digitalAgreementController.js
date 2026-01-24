@@ -1,6 +1,7 @@
 const DigitalAgreement = require("../models/DigitalAgreement");
 const Franchise = require("../models/Franchise");
 const User = require("../models/User");
+const Package = require("../models/Package");
 const Setting = require("../models/Setting");
 const KycRequest = require("../models/KycRequest");
 const fs = require("fs");
@@ -455,6 +456,17 @@ const createDigitalAgreement = async (req, res) => {
       packagePrice: "Rs. 0", // Default value to avoid encoding issues
     };
 
+    // Get the price of the assigned packages
+    if (franchise.assignedPackages && franchise.assignedPackages.length > 0) {
+      const packages = await Package.find({ _id: { $in: franchise.assignedPackages } });
+      if (packages.length > 0) {
+        // Use the price of the first assigned package as the packagePrice
+        // Or sum all if multiple packages are assigned
+        const totalPrice = packages.reduce((sum, pkg) => sum + (pkg.price || 0), 0);
+        userData.packagePrice = `Rs. ${totalPrice.toLocaleString()}`;
+      }
+    }
+
     // Generate PDF with user data
     const generatedPdfPath = await generatePdfWithUserData(
       templatePath,
@@ -589,6 +601,17 @@ const getDigitalAgreement = async (req, res) => {
             : ""),
         packagePrice: "Rs. 0", // Default value, will be updated when package is selected
       };
+
+      // Get the price of the assigned packages
+      if (franchise.assignedPackages && franchise.assignedPackages.length > 0) {
+        const packages = await Package.find({ _id: { $in: franchise.assignedPackages } });
+        if (packages.length > 0) {
+          // Use the price of the first assigned package as the packagePrice
+          // Or sum all if multiple packages are assigned
+          const totalPrice = packages.reduce((sum, pkg) => sum + (pkg.price || 0), 0);
+          userData.packagePrice = `Rs. ${totalPrice.toLocaleString()}`;
+        }
+      }
 
       // Generate PDF with user data
       const generatedPdfPath = await generatePdfWithUserData(
@@ -828,6 +851,17 @@ const updateAgreementPackageDetails = async (userId, packageDetails) => {
       throw new Error("Franchise or user not found");
     }
 
+    // Get the price of the assigned packages
+    let packagePrice = "Rs. 0";
+    if (franchise.assignedPackages && franchise.assignedPackages.length > 0) {
+      const packages = await Package.find({ _id: { $in: franchise.assignedPackages } });
+      if (packages.length > 0) {
+        // Sum all assigned packages prices
+        const totalPrice = packages.reduce((sum, pkg) => sum + (pkg.price || 0), 0);
+        packagePrice = `Rs. ${totalPrice.toLocaleString()}`;
+      }
+    }
+
     // Update the package price in the PDF by regenerating it
     const templatePath = digitalAgreement.templatePath;
 
@@ -839,7 +873,7 @@ const updateAgreementPackageDetails = async (userId, packageDetails) => {
       pan: franchise.panNumber || "",
       aadhar: franchise.aadharNumber || "",
       address: franchise.businessAddress || "",
-      packagePrice: packageDetails.price || "Rs. 0",
+      packagePrice: packagePrice,
     };
 
     // Regenerate the PDF with updated package details

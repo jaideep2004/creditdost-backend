@@ -10,6 +10,7 @@ const Setting = require('../models/Setting');
 const BusinessForm = require('../models/BusinessForm');
 const KycRequest = require('../models/KycRequest');
 const { sendLeadAssignmentEmail, sendAccountCredentialsEmail, sendAdminNotificationEmail, sendRegistrationApprovalEmail, sendRegistrationRejectionEmail } = require('../utils/emailService');
+const { updateAgreementPackageDetails } = require('./digitalAgreementController');
 const csv = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
@@ -742,9 +743,19 @@ const createFranchiseUser = async (req, res) => {
         totalCredits += pkg.creditsIncluded || 0;
       });
       
+      // Calculate total price of packages
+      const totalPrice = packages.reduce((sum, pkg) => sum + (pkg.price || 0), 0);
+      
       // Set initial credits
       franchiseData.credits = totalCredits;
       franchiseData.totalCreditsPurchased = totalCredits;
+      
+      // Update digital agreement with package details
+      try {
+        await updateAgreementPackageDetails(user._id, { price: `Rs. ${totalPrice}`, name: packages[0]?.name || 'Package', credits: totalCredits });
+      } catch (agreementError) {
+        console.error('Failed to update digital agreement with package details for new franchise:', agreementError);
+      }
     }
     
     const franchise = new Franchise(franchiseData);
@@ -1093,9 +1104,19 @@ const approveRegistration = async (req, res) => {
         totalCredits += pkg.creditsIncluded || 0;
       });
       
+        // Calculate total price of packages
+      const totalPrice = packages.reduce((sum, pkg) => sum + (pkg.price || 0), 0);
+      
       // Add credits to franchise
       franchise.credits += totalCredits;
       franchise.totalCreditsPurchased += totalCredits;
+      
+      // Update digital agreement with package details
+      try {
+        await updateAgreementPackageDetails(user._id, { price: `Rs. ${totalPrice}`, name: packages[0]?.name || 'Package', credits: totalCredits });
+      } catch (agreementError) {
+        console.error('Failed to update digital agreement with package details:', agreementError);
+      }
     }
     
     await user.save();
