@@ -363,20 +363,25 @@ const sendReferralEmail = async (referral, referrerFranchise) => {
 };
 
 // Send credit report email to user and admin
-const sendCreditReportEmail = async (recipient, creditReport, reportUrl) => {
+const sendCreditReportEmail = async (recipient, creditReport) => {
   // Validate recipient object
   if (!recipient || !recipient.email) {
     throw new Error('Recipient email is required');
   }
 
+  // Use local path if available for permanent download link
+  const downloadLink = creditReport.localPath 
+    ? `${process.env.BACKEND_URL || 'http://localhost:5000'}${creditReport.localPath}`
+    : creditReport.reportUrl;
+
   const mailOptions = {
     from: '"CreditDost" <support@creditdost.co.in> ',
     to: recipient.email,
-    subject: `Your Experian Credit Report - CreditDost`,
+    subject: `Your ${creditReport.bureau ? creditReport.bureau.toUpperCase() : 'Experian'} Credit Report - CreditDost`,
     html: `
-      <h2>Your Experian Credit Report</h2>
+      <h2>Your ${creditReport.bureau ? creditReport.bureau.toUpperCase() : 'Experian'} Credit Report</h2>
       <p>Hello ${recipient.name || 'User'},</p>
-      <p>Your Experian credit report has been successfully generated.</p>
+      <p>Your credit report has been successfully generated.</p>
       <p><strong>Report Details:</strong></p>
       <ul>
         <li>Name: ${creditReport.name}</li>
@@ -386,7 +391,8 @@ const sendCreditReportEmail = async (recipient, creditReport, reportUrl) => {
         <li>Credit Score: ${creditReport.score || 'Not available'}</li>
         <li>Bureau: ${creditReport.bureau ? creditReport.bureau.toUpperCase() : 'Experian'}</li>
       </ul>
-      ${reportUrl ? `<p><a href="${reportUrl}" style="background-color: #6200ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Download Report</a></p>` : ''}
+      ${downloadLink ? `<p><a href="${downloadLink}" style="background-color: #6200ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Download Report</a></p>
+      <p><small>Note: This link will remain active permanently.</small></p>` : ''}
       <p>If you have any questions, feel free to contact us at ${process.env.EMAIL_USER}.</p>
       <p>Best regards,<br>The CreditDost Team</p>
     `,
@@ -575,7 +581,7 @@ const sendAIAnalysisNotificationToAdmin = async (franchise, documentName, docume
       <p><strong>Document:</strong> ${documentName}</p>
       <p>Please find the attached document for review.</p>
       <p>Please log in to the admin dashboard to review the document.</p>
-      <p><a href="${process.env.FRONTEND_URL}/admin/ai-analysis">View AI Analysis Documents</a></p>
+     
       <p>Best regards,<br>The CreditDost System</p>
     `,
     attachments: [
@@ -602,7 +608,7 @@ const sendAIAnalysisResponseToFranchise = async (franchise, documentName, docume
       <p><strong>Document:</strong> ${documentName}</p>
       <p>Please find the attached response document.</p>
       <p>Please log in to your franchise dashboard to view additional details.</p>
-      <p><a href="${process.env.FRONTEND_URL}/franchise/ai-analysis">View AI Analysis Documents</a></p>
+      
       <p>Best regards,<br>The CreditDost Team</p>
     `,
     attachments: [

@@ -125,10 +125,10 @@ const submitBusinessForm = async (req, res) => {
     
     await businessForm.save();
     
-    // Sync with Google Sheets
+    // Sync with Google Sheets (Business Login tab only - franchise dashboard entries)
     try {
       await googleSheetsService.initialize();
-      await googleSheetsService.syncBusinessFormData();
+      await googleSheetsService.syncBusinessLoginData(); // Sync to business login/MIS tab
     } catch (syncError) {
       console.error('Failed to sync business form data with Google Sheets:', syncError);
     }
@@ -192,6 +192,14 @@ const verifyPayment = async (req, res) => {
     businessForm.razorpayPaymentId = razorpay_payment_id;
     businessForm.razorpaySignature = razorpay_signature;
     await businessForm.save();
+    
+    // Sync with Google Sheets to update payment status (Business Login tab only)
+    try {
+      await googleSheetsService.initialize();
+      await googleSheetsService.syncBusinessLoginData(); // Sync updated payment status
+    } catch (syncError) {
+      console.error('Failed to sync business login data with Google Sheets:', syncError);
+    }
     
     // Send email notifications
     try {

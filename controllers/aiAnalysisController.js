@@ -22,12 +22,12 @@ const uploadDocument = async (req, res) => {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      // Check if file is a PDF
+      // Check if file is a PDF or HTML
       const fileExtension = path.extname(req.file.originalname).toLowerCase();
-      if (fileExtension !== '.pdf') {
+      if (fileExtension !== '.pdf' && fileExtension !== '.html' && fileExtension !== '.htm') {
         // Delete the uploaded file
         fs.unlinkSync(req.file.path);
-        return res.status(400).json({ message: 'Only PDF files are allowed' });
+        return res.status(400).json({ message: 'Only PDF and HTML files are allowed' });
       }
 
       // Get franchise details
@@ -114,12 +114,12 @@ const respondToDocument = async (req, res) => {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      // Check if file is a PDF
+      // Check if file is a PDF or HTML
       const fileExtension = path.extname(req.file.originalname).toLowerCase();
-      if (fileExtension !== '.pdf') {
+      if (fileExtension !== '.pdf' && fileExtension !== '.html' && fileExtension !== '.htm') {
         // Delete the uploaded file
         fs.unlinkSync(req.file.path);
-        return res.status(400).json({ message: 'Only PDF files are allowed' });
+        return res.status(400).json({ message: 'Only PDF and HTML files are allowed' });
       }
 
       // Find the document

@@ -9,7 +9,9 @@ const ensureRequiredTabs = (tabsMap) => {
     'creditScoreRepair',
     'contactUs',
     'newRegistration',
-    'franchiseOpportunity'
+    'franchiseOpportunity',
+    'businessLogin',
+    'suvidhaCentre'
   ];
   
   for (const tab of requiredTabs) {
@@ -34,7 +36,9 @@ const getSettings = async (req, res) => {
         ['creditScoreRepair', { enabled: true, lastSync: null }],
         ['contactUs', { enabled: true, lastSync: null }],
         ['newRegistration', { enabled: true, lastSync: null }],
-        ['franchiseOpportunity', { enabled: true, lastSync: null }]
+        ['franchiseOpportunity', { enabled: true, lastSync: null }],
+        ['businessLogin', { enabled: true, lastSync: null }],
+        ['suvidhaCentre', { enabled: true, lastSync: null }]
       ]);
       
       return res.json({
@@ -165,7 +169,9 @@ const updateSettings = async (req, res) => {
           ['creditScoreRepair', { enabled: true, lastSync: null }],
           ['contactUs', { enabled: true, lastSync: null }],
           ['newRegistration', { enabled: true, lastSync: null }],
-          ['franchiseOpportunity', { enabled: true, lastSync: null }]
+          ['franchiseOpportunity', { enabled: true, lastSync: null }],
+          ['businessLogin', { enabled: true, lastSync: null }],
+          ['suvidhaCentre', { enabled: true, lastSync: null }]
         ]);
       }
       
@@ -354,6 +360,48 @@ const syncFranchiseOpportunityData = async (req, res) => {
   }
 };
 
+// Sync business login data
+const syncBusinessLoginData = async (req, res) => {
+  try {
+    const initialized = await googleSheetsService.initialize();
+    
+    if (!initialized) {
+      return res.status(500).json({ message: 'Failed to initialize Google Sheets service' });
+    }
+    
+    const result = await googleSheetsService.syncBusinessLoginData();
+    
+    if (result.success) {
+      res.json({ message: `Successfully synced ${result.count} business login records` });
+    } else {
+      res.status(500).json({ message: 'Failed to sync business login data', error: result.error });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Sync suvidha centre application data
+const syncSuvidhaCentreData = async (req, res) => {
+  try {
+    const initialized = await googleSheetsService.initialize();
+    
+    if (!initialized) {
+      return res.status(500).json({ message: 'Failed to initialize Google Sheets service' });
+    }
+    
+    const result = await googleSheetsService.syncSuvidhaCentreApplicationData();
+    
+    if (result.success) {
+      res.json({ message: `Successfully synced ${result.count} suvidha centre application records` });
+    } else {
+      res.status(500).json({ message: 'Failed to sync suvidha centre application data', error: result.error });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // Sync all data
 const syncAllData = async (req, res) => {
   try {
@@ -389,5 +437,7 @@ module.exports = {
   syncContactFormData,
   syncRegistrationData,
   syncFranchiseOpportunityData,
+  syncBusinessLoginData,
+  syncSuvidhaCentreData,
   syncAllData
 };

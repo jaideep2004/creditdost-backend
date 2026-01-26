@@ -98,7 +98,8 @@ class GoogleSheetsService {
         'Contact Us',
         'New Registration',
         'Franchise Opportunity',
-        'Suvidha Centre'
+        'Suvidha Centre',
+        'Business Login'
       ]; 
 
       // Get existing sheets
@@ -209,23 +210,37 @@ class GoogleSheetsService {
 
       // Format data for Google Sheets
       const rows = [
-        ['Name', 'Email', 'Phone', 'Credit Score', 'Date'], // Header row
-        ...creditReports.map(report => [
-          report.name,
-          report.email || (report.userId ? report.userId.email : ''),
-          report.mobile || '',
-          report.score ? report.score.toString() : '',
-          report.createdAt.toISOString().split('T')[0]
-        ])
+        ['Name', 'Email', 'Phone', 'Credit Score', 'Date', 'Report Link'], // Header row
+        ...creditReports.map(report => {
+          // Construct the report link - use localPath if available, otherwise use reportUrl
+          let reportLink = '';
+          if (report.localPath) {
+            // Use the local path for a permanent link
+            const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+            reportLink = `${backendUrl}${report.localPath}`;
+          } else if (report.reportUrl) {
+            // Fallback to the original report URL
+            reportLink = report.reportUrl;
+          }
+          
+          return [
+            report.name,
+            report.email || (report.userId ? report.userId.email : ''),
+            report.mobile || '',
+            report.score ? report.score.toString() : '',
+            report.createdAt.toISOString().split('T')[0],
+            reportLink
+          ];
+        })
       ];
 
       console.log('Updating Google Sheet with', rows.length, 'rows');
 
       // Update Google Sheet
-      console.log('Updating spreadsheet:', settings.spreadsheetId, 'range:', `Credit Score!A1:E${rows.length}`);
+      console.log('Updating spreadsheet:', settings.spreadsheetId, 'range:', `Credit Score!A1:F${rows.length}`);
       const updateResult = await this.sheets.spreadsheets.values.update({
         spreadsheetId: settings.spreadsheetId,
-        range: `Credit Score!A1:E${rows.length}`,
+        range: `Credit Score!A1:F${rows.length}`,
         valueInputOption: 'RAW',
         resource: {
           values: rows
@@ -253,6 +268,7 @@ class GoogleSheetsService {
   }
 
   // Sync business form data (apply for loan) to Google Sheets
+  // This tab should contain entries from the public "Apply for Loan" page only
   async syncBusinessFormData() {
     try {
       const settings = await GoogleSheet.findOne({ isActive: true });
@@ -272,8 +288,10 @@ class GoogleSheetsService {
         return { success: false, message: 'Failed to create required tabs' };
       }
 
-      // Get business forms from database
-      const businessForms = await BusinessForm.find({}).populate('franchiseId', 'businessName').sort({ createdAt: -1 });
+      // Get business forms from database (excluding franchise dashboard entries)
+      // Business forms from franchise dashboard should have franchiseId, public entries should not
+      const businessForms = await BusinessForm.find({ franchiseId: { $exists: false } })
+        .sort({ createdAt: -1 });
 
       // Format data for Google Sheets
       const rows = [
@@ -318,6 +336,75 @@ class GoogleSheetsService {
       return { success: true, count: businessForms.length };
     } catch (error) {
       console.error('Failed to sync business form data:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Sync business login data to Google Sheets
+  // This tab should contain entries from the franchise dashboard only
+  async syncBusinessLoginData() {
+    try {
+      const settings = await GoogleSheet.findOne({ isActive: true });
+      if (!settings || !settings.tabs || !settings.tabs.get('businessLogin')) {
+        return { success: false, message: 'Business login tab not configured' };
+      }
+
+      const tabSettings = settings.tabs.get('businessLogin');
+      if (!tabSettings || !tabSettings.enabled) {
+        return { success: false, message: 'Business login tab not enabled' };
+      }
+
+      // Create required tabs if they don't exist
+      const tabsCreated = await this.createRequiredTabs(settings.spreadsheetId);
+      if (!tabsCreated) {
+        console.log('Failed to create required tabs, aborting sync');
+        return { success: false, message: 'Failed to create required tabs' };
+      }
+
+      // Get business forms from database (franchise dashboard entries only)
+      // Business forms from franchise dashboard should have franchiseId
+      const businessForms = await BusinessForm.find({ franchiseId: { $exists: true } })
+        .populate('franchiseId', 'businessName')
+        .sort({ createdAt: -1 });
+
+      // Format data for Google Sheets with franchise information (excluding WhatsApp Number and City columns)
+      const rows = [
+        ['Franchise Name', 'Customer Name', 'Customer Email', 'Customer Phone', 'PAN Number', 'Aadhar Number', 'State', 'Pincode', 'Occupation', 'Monthly Income', 'Date'], // Header row
+        ...businessForms.map(form => [
+          form.franchiseId?.businessName || 'N/A',
+          form.customerName,
+          form.customerEmail,
+          form.customerPhone,
+          form.panNumber || '',
+          form.aadharNumber || '',
+          form.state || '',
+          form.pincode || '',
+          form.occupation || '',
+          form.monthlyIncome ? form.monthlyIncome.toString() : '',
+          form.createdAt.toISOString().split('T')[0]
+        ])
+      ];
+
+      // Update Google Sheet
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: settings.spreadsheetId,
+        range: `Business Login!A1:L${rows.length}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: rows
+        }
+      });
+
+      // Update last sync timestamp
+      settings.tabs.set('businessLogin', {
+        ...tabSettings,
+        lastSync: new Date()
+      });
+      await settings.save();
+
+      return { success: true, count: businessForms.length };
+    } catch (error) {
+      console.error('Failed to sync business login data:', error);
       return { success: false, error: error.message };
     }
   }
@@ -367,7 +454,7 @@ class GoogleSheetsService {
       // Update Google Sheet
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: settings.spreadsheetId,
-        range: `Credit Score Repair!A1:I${rows.length}`,
+        range: `Credit Score Repair!A1:L${rows.length}`,
         valueInputOption: 'RAW',
         resource: {
           values: rows
@@ -449,6 +536,9 @@ class GoogleSheetsService {
   }
 
   // Sync registration data to Google Sheets
+  // This tab should contain only admin-created franchise users
+  // We identify admin-created users by checking for users with isVerified: true
+  // who were created very recently (within the last 10 seconds)
   async syncRegistrationData() {
     try {
       const settings = await GoogleSheet.findOne({ isActive: true });
@@ -468,8 +558,16 @@ class GoogleSheetsService {
         return { success: false, message: 'Failed to create required tabs' };
       }
 
-      // Get users from database with explicit field selection to ensure all fields are retrieved
-      const users = await User.find({ role: 'franchise_user' })
+      // Get admin-created users from database
+      // Admin-created users have isVerified: true immediately upon creation
+      // Self-registered users have isVerified: false initially and only get isVerified: true after admin approval
+      // So we look for users who have isVerified: true and were created very recently (within the last 10 seconds)
+      const tenSecondsAgo = new Date(Date.now() - 10000);
+      const users = await User.find({ 
+        role: 'franchise_user',
+        isVerified: true,
+        createdAt: { $gte: tenSecondsAgo }
+      })
         .select('name email phone state pincode language createdAt')
         .sort({ createdAt: -1 });
 
@@ -534,27 +632,41 @@ class GoogleSheetsService {
 
       // Format data for Google Sheets
       const rows = [
-        ['Name', 'Email', 'Phone', 'Credit Score', 'Occupation', 'City', 'State', 'Language', 'Date'], // Header row
-        ...creditReports.map(report => [
-          report.name,
-          report.email || '',
-          report.mobile || '',
-          report.score ? report.score.toString() : '',
-          report.occupation || '',
-          report.city || '',
-          report.state || '',
-          report.language || '',
-          report.createdAt.toISOString().split('T')[0]
-        ])
+        ['Name', 'Email', 'Phone', 'Credit Score', 'Occupation', 'City', 'State', 'Language', 'Date', 'Report Link'], // Header row
+        ...creditReports.map(report => {
+          // Construct the report link - use localPath if available, otherwise use reportUrl
+          let reportLink = '';
+          if (report.localPath) {
+            // Use the local path for a permanent link
+            const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+            reportLink = `${backendUrl}${report.localPath}`;
+          } else if (report.reportUrl) {
+            // Fallback to the original report URL
+            reportLink = report.reportUrl;
+          }
+          
+          return [
+            report.name,
+            report.email || '',
+            report.mobile || '',
+            report.score ? report.score.toString() : '',
+            report.occupation || '',
+            report.city || '',
+            report.state || '',
+            report.language || '',
+            report.createdAt.toISOString().split('T')[0],
+            reportLink
+          ];
+        })
       ];
 
       console.log('Updating Google Sheet with', rows.length, 'rows');
 
       // Update Google Sheet
-      console.log('Updating spreadsheet:', settings.spreadsheetId, 'range:', `Website Credit Reports!A1:I${rows.length}`);
+      console.log('Updating spreadsheet:', settings.spreadsheetId, 'range:', `Website Credit Reports!A1:J${rows.length}`);
       const updateResult = await this.sheets.spreadsheets.values.update({
         spreadsheetId: settings.spreadsheetId,
-        range: `Website Credit Reports!A1:I${rows.length}`,
+        range: `Website Credit Reports!A1:J${rows.length}`,
         valueInputOption: 'RAW',
         resource: {
           values: rows
@@ -579,6 +691,7 @@ class GoogleSheetsService {
       creditScore: await this.syncCreditScoreData(),
       publicCreditScore: await this.syncPublicCreditScoreData(),
       businessForm: await this.syncBusinessFormData(),
+      businessLogin: await this.syncBusinessLoginData(),
       creditRepair: await this.syncCreditRepairData(),
       contactForm: await this.syncContactFormData(),
       registration: await this.syncRegistrationData(),

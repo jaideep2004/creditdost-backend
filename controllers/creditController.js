@@ -600,15 +600,13 @@ const checkCreditScorePublic = async (req, res) => {
       // Send email to user
       await sendCreditReportEmail(
         { email: email, name: name }, // Use the email from request
-        creditReport,
-        reportUrl
+        creditReport
       );
       
       // Send email to admin
       await sendCreditReportEmail(
         { email: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, name: "Admin" },
-        creditReport,
-        reportUrl
+        creditReport
       );
     } catch (emailError) {
       console.error("Error sending email:", emailError);

@@ -13,6 +13,8 @@ const {
   syncContactFormData,
   syncRegistrationData, 
   syncFranchiseOpportunityData,
+  syncBusinessLoginData,
+  syncSuvidhaCentreData,
   syncAllData
 } = require('../controllers/googleSheetsController');
 
@@ -40,6 +42,9 @@ router.route('/sync/credit-score')
 router.route('/sync/business-form')
   .post(syncBusinessFormData);
 
+router.route('/sync/business-login')
+  .post(syncBusinessLoginData);
+
 router.route('/sync/credit-repair')
   .post(syncCreditRepairData);
 
@@ -51,6 +56,9 @@ router.route('/sync/registration')
 
 router.route('/sync/franchise-opportunity')
   .post(syncFranchiseOpportunityData);
+
+router.route('/sync/suvidha-centre')
+  .post(syncSuvidhaCentreData);
 
 router.route('/sync/all')
   .post(syncAllData);

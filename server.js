@@ -26,7 +26,8 @@ const runGoogleSheetsMigration = async () => {
       'creditScoreRepair',
       'contactUs',
       'newRegistration',
-      'franchiseOpportunity'
+      'franchiseOpportunity',
+      'businessLogin'
     ];
     
     for (const settings of settingsList) {
