@@ -11,6 +11,7 @@ const BusinessForm = require('../models/BusinessForm');
 const KycRequest = require('../models/KycRequest');
 const { sendLeadAssignmentEmail, sendAccountCredentialsEmail, sendAdminNotificationEmail, sendRegistrationApprovalEmail, sendRegistrationRejectionEmail } = require('../utils/emailService');
 const { updateAgreementPackageDetails } = require('./digitalAgreementController');
+const googleSheetsService = require('../utils/googleSheetsService');
 const csv = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
@@ -39,7 +40,7 @@ const csvUpload = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
 });
-
+     
 // Get dashboard statistics
 const getDashboardStats = async (req, res) => {
   try {
@@ -51,8 +52,8 @@ const getDashboardStats = async (req, res) => {
     const totalTransactions = await Transaction.countDocuments({ status: 'paid' });
     
     // Calculate total revenue
-    const revenueResult = await Transaction.aggregate([
-      { $match: { status: 'paid' } },
+    const revenueResult = await Transaction.aggregate([        
+      { $match: { status: 'paid' } },   
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
     
@@ -713,7 +714,8 @@ const createFranchiseUser = async (req, res) => {
       language,
       password: tempPassword,
       role: 'franchise_user',
-      isActive: true // Activate user immediately when created by admin
+      isActive: true, // Activate user immediately when created by admin
+      isVerified: true // Mark as verified since admin created this user
     });
     
     await user.save();
@@ -787,6 +789,21 @@ const createFranchiseUser = async (req, res) => {
     } catch (emailError) {
       console.error('Failed to send admin notification email:', emailError);
       // Don't fail the creation if email sending fails
+    }
+    
+    // Trigger sync to Google Sheets for new registration
+    try {
+      const initialized = await googleSheetsService.initialize();
+      if (initialized) {
+        // Sync registration data to Google Sheets
+        await googleSheetsService.syncRegistrationData();
+        console.log('Successfully synced new franchise user to Google Sheets');
+      } else {
+        console.error('Failed to initialize Google Sheets service for sync');
+      }
+    } catch (syncError) {
+      console.error('Failed to sync new franchise user to Google Sheets:', syncError);
+      // Don't fail the creation if sync fails
     }
     
     res.status(201).json({
@@ -1091,6 +1108,7 @@ const approveRegistration = async (req, res) => {
     
     // Activate user and franchise
     user.isActive = true;
+    user.isVerified = true; // Mark as verified since admin approved this registration
     franchise.isActive = true;
     
     // Assign packages and add credits if provided
@@ -1144,6 +1162,21 @@ const approveRegistration = async (req, res) => {
         stack: emailError.stack
       });
       // Don't fail the approval if email sending fails
+    }
+    
+    // Trigger sync to Google Sheets for new registration
+    try {
+      const initialized = await googleSheetsService.initialize();
+      if (initialized) {
+        // Sync registration data to Google Sheets
+        await googleSheetsService.syncRegistrationData();
+        console.log('Successfully synced approved franchise user to Google Sheets');
+      } else {
+        console.error('Failed to initialize Google Sheets service for sync');
+      }
+    } catch (syncError) {
+      console.error('Failed to sync approved franchise user to Google Sheets:', syncError);
+      // Don't fail the approval if sync fails
     }
     
     res.json({

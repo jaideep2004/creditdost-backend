@@ -80,8 +80,18 @@ class GoogleSheetsService {
       console.error('Please verify that:');
       console.error('1. You have uploaded a valid credentials JSON file');
       console.error('2. The Google Sheet is shared with the service account email from your credentials');
-      console.error('Service account email:', credentials.client_email);
-      console.error('Spreadsheet ID:', settings.spreadsheetId);
+      
+      // Get service account email from settings if available
+      let serviceAccountEmail = 'Service account email not available';
+      if (settings && settings.credentials) {
+        const decryptedCreds = this.decryptCredentials(settings.credentials);
+        if (decryptedCreds && decryptedCreds.client_email) {
+          serviceAccountEmail = decryptedCreds.client_email;
+        }
+      }
+      console.error('Service account email:', serviceAccountEmail);
+      console.error('Spreadsheet ID:', settings ? settings.spreadsheetId : 'Settings not available');
+      console.error('Solution: Make sure to share your Google Sheet with the service account email as an editor');
       return false;
     }
   }
@@ -161,8 +171,14 @@ class GoogleSheetsService {
     } catch (error) {
       console.error('Failed to create required tabs:', error.message);
       console.error('This usually means the service account does not have access to the spreadsheet.');
-      console.error('Please make sure to share your Google Sheet with the service account email:', 
-        credentials.client_email || 'Service account email not available');
+      
+      // Access the service account email from the class instance's auth object
+      let serviceAccountEmail = 'Service account email not available';
+      if (this.auth && this.auth.email) {
+        serviceAccountEmail = this.auth.email;
+      }
+      
+      console.error('Please make sure to share your Google Sheet with the service account email:', serviceAccountEmail);
       
       // Check if it's a specific permission error
       if (error.response && error.response.data && error.response.data.error) {
@@ -172,6 +188,9 @@ class GoogleSheetsService {
           console.error('1. The Google Sheet ID is correct');
           console.error('2. The service account email is shared with edit access to the spreadsheet');
           console.error('3. The credentials JSON file is valid and not expired');
+          console.error('4. Go to your Google Sheet, click Share, and add the service account email as an EDITOR (not just viewer)');
+          console.error('   Service account email:', serviceAccountEmail);
+          console.error('   Note: Need explicit editor permissions to create/edit sheets, not just view them');
         }
       }
       
@@ -537,8 +556,7 @@ class GoogleSheetsService {
 
   // Sync registration data to Google Sheets
   // This tab should contain only admin-created franchise users
-  // We identify admin-created users by checking for users with isVerified: true
-  // who were created very recently (within the last 10 seconds)
+  // Admin-created users have isVerified: true, while self-registered users start with isVerified: false
   async syncRegistrationData() {
     try {
       const settings = await GoogleSheet.findOne({ isActive: true });
@@ -558,15 +576,11 @@ class GoogleSheetsService {
         return { success: false, message: 'Failed to create required tabs' };
       }
 
-      // Get admin-created users from database
-      // Admin-created users have isVerified: true immediately upon creation
-      // Self-registered users have isVerified: false initially and only get isVerified: true after admin approval
-      // So we look for users who have isVerified: true and were created very recently (within the last 10 seconds)
-      const tenSecondsAgo = new Date(Date.now() - 10000);
+      // Get all franchise users created by admin (isVerified: true) from database
+      // We sync admin-created franchise users to maintain consistency in the New Registration tab
       const users = await User.find({ 
         role: 'franchise_user',
-        isVerified: true,
-        createdAt: { $gte: tenSecondsAgo }
+        isVerified: true
       })
         .select('name email phone state pincode language createdAt')
         .sort({ createdAt: -1 });
