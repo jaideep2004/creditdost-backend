@@ -646,7 +646,7 @@ class GoogleSheetsService {
 
       // Format data for Google Sheets
       const rows = [
-        ['Name', 'Email', 'Phone', 'Credit Score', 'Occupation', 'City', 'State', 'Language', 'Date', 'Report Link'], // Header row
+        ['Name', 'Email', 'Phone', 'PAN', 'Credit Score', 'Occupation', 'City', 'State', 'Language', 'Date', 'Report Link'], // Header row
         ...creditReports.map(report => {
           // Construct the report link - use localPath if available, otherwise use reportUrl
           let reportLink = '';
@@ -663,6 +663,7 @@ class GoogleSheetsService {
             report.name,
             report.email || '',
             report.mobile || '',
+            report.pan || '',
             report.score ? report.score.toString() : '',
             report.occupation || '',
             report.city || '',
@@ -677,10 +678,10 @@ class GoogleSheetsService {
       console.log('Updating Google Sheet with', rows.length, 'rows');
 
       // Update Google Sheet
-      console.log('Updating spreadsheet:', settings.spreadsheetId, 'range:', `Website Credit Reports!A1:J${rows.length}`);
+      console.log('Updating spreadsheet:', settings.spreadsheetId, 'range:', `Website Credit Reports!A1:K${rows.length}`);
       const updateResult = await this.sheets.spreadsheets.values.update({
         spreadsheetId: settings.spreadsheetId,
-        range: `Website Credit Reports!A1:J${rows.length}`,
+        range: `Website Credit Reports!A1:K${rows.length}`,
         valueInputOption: 'RAW',
         resource: {
           values: rows
