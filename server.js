@@ -134,10 +134,10 @@ const corsOptions = {
     // List of allowed origins - easily expandable for additional origins
     const allowedOrigins = [
       process.env.FRONTEND_URL || "http://localhost:5173",
-      "https://creditdost.onrender.com",
-      "http://localhost:5000",
+      "https://reactbackend.creditdostlearning.com",
       "https://creditdost.co.in",
-      "http://localhost:5000"
+      "https://www.creditdost.co.in",
+      "https://reactbackend.creditdostlearning.com"
       
     ];
     
