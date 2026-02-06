@@ -36,7 +36,7 @@ doc.text('NOW, THEREFORE, in consideration of the mutual covenants contained her
 doc.moveDown();
 doc.fontSize(16).text('AGREEMENT TERMS', 100, 430);
 doc.fontSize(12).text('1. GRANT OF FRANCHISE', 100, 460);
-doc.text('The Company grants to the Franchisee a non-exclusive license to operate a CreditDost franchise.', 120, 480);
+doc.text('The Company grants to the Franchisee a non-exclusive license to operate a Credit Dost franchise.', 120, 480);
 
 doc.moveDown();
 doc.text('2. TERM', 100, 520);

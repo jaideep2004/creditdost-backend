@@ -235,7 +235,7 @@ class GoogleSheetsService {
           let reportLink = '';
           if (report.localPath) {
             // Use the local path for a permanent link
-            const backendUrl = process.env.BACKEND_URL || 'https://reactbackend.creditdostlearning.com';
+            const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
             reportLink = `${backendUrl}${report.localPath}`;
           } else if (report.reportUrl) {
             // Fallback to the original report URL
@@ -652,7 +652,7 @@ class GoogleSheetsService {
           let reportLink = '';
           if (report.localPath) {
             // Use the local path for a permanent link
-            const backendUrl = process.env.BACKEND_URL || 'https://reactbackend.creditdostlearning.com';
+            const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
             reportLink = `${backendUrl}${report.localPath}`;
           } else if (report.reportUrl) {
             // Fallback to the original report URL

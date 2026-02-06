@@ -403,9 +403,13 @@ const checkCreditScore = async (req, res) => {
 // Check credit score for specific bureau (public version for Experian only)
 const checkCreditScorePublic = async (req, res) => {
   try {
+    console.log("=== Starting checkCreditScorePublic ===");
+    console.log("Request body received:", JSON.stringify(req.body, null, 2));
+    
     // Validate request body
     const { error } = creditCheckSchema.validate(req.body, { abortEarly: false });
     if (error) {
+      console.log("Validation failed:", error.details);
       const errorMessages = error.details.map(detail => detail.message);
       return res.status(400).json({
         message: "Validation error",
@@ -429,25 +433,35 @@ const checkCreditScorePublic = async (req, res) => {
       language,
     } = req.body;
 
+    console.log("Parsed form data:", { name, mobile, email, bureau, pan });
+
     // Only allow Experian for public access
     if (bureau !== "experian") {
+      console.log("Bureau validation failed - only Experian allowed for public access");
       return res.status(400).json({ 
         message: "Only Experian credit reports are available for public access" 
       });
     }
 
     // Get Surepass API key
+    console.log("Fetching Surepass API key...");
     const apiKey = await getSurepassApiKeyValue();
+    console.log("API key fetched:", apiKey ? "KEY_EXISTS" : "NO_KEY_FOUND");
+    
     if (!apiKey) {
+      console.log("Surepass API key not configured");
       return res
         .status(500)
         .json({ message: "Surepass API key not configured" });
     }
 
     // Get the appropriate endpoint and data formatter for the bureau
+    console.log("Getting bureau config for:", bureau);
     const bureauConfig = getBureauConfig(bureau);
+    console.log("Bureau config retrieved:", { endpoint: bureauConfig.endpoint });
 
     // Prepare request data based on bureau requirements
+    console.log("Formatting request data...");
     const requestData = bureauConfig.formatData({
       name,
       mobile,
@@ -457,10 +471,17 @@ const checkCreditScorePublic = async (req, res) => {
       dob,
       gender,
     });
+    console.log("Formatted request data:", JSON.stringify(requestData, null, 2));
 
     // Make request to Surepass API with timeout and better error handling
     let response;
     try {
+      console.log("Making request to Surepass API endpoint:", bureauConfig.endpoint);
+      console.log("Request headers (excluding API key for security):", { 
+        "Content-Type": "application/json",
+        "Authorization": apiKey ? "[HIDDEN]" : "MISSING"
+      });
+      
       response = await axios.post(bureauConfig.endpoint, requestData, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -468,8 +489,21 @@ const checkCreditScorePublic = async (req, res) => {
         },
         timeout: 30000, // 30 second timeout
       });
+      
+      console.log("Surepass API response received:", {
+        status: response.status,
+        statusText: response.statusText,
+        hasData: !!response.data,
+        hasDataData: !!(response.data && response.data.data)
+      });
     } catch (apiError) {
-      console.error("Surepass API error:", apiError.message);
+      console.error("Surepass API error occurred:");
+      console.error("- Message:", apiError.message);
+      console.error("- Code:", apiError.code);
+      console.error("- Is Axios Error:", apiError.isAxiosError);
+      console.error("- Response Status:", apiError.response?.status);
+      console.error("- Response Data:", JSON.stringify(apiError.response?.data, null, 2));
+      console.error("- Request URL:", bureauConfig.endpoint);
 
       // Handle timeout specifically
       if (apiError.code === "ETIMEDOUT" || apiError.code === "ECONNABORTED") {
@@ -508,8 +542,12 @@ const checkCreditScorePublic = async (req, res) => {
     let score = null;
     if (response.data.data && response.data.data.score) {
       score = response.data.data.score;
+      console.log("Score extracted from response.data.data.score:", score);
     } else if (response.data.data && response.data.data.credit_score) {
       score = response.data.data.credit_score;
+      console.log("Score extracted from response.data.data.credit_score:", score);
+    } else {
+      console.log("No score found in response data");
     }
 
     // Extract report URL from response
@@ -522,9 +560,11 @@ const checkCreditScorePublic = async (req, res) => {
         response.data.data.credit_report_link ||
         response.data.data.report_link ||
         null;
+      console.log("Report URL extracted:", reportUrl);
     }
 
     // Save credit report without user/franchise association for public reports
+    console.log("Creating credit report record in database...");
     const creditReport = new CreditReport({
       name,
       mobile,
@@ -545,17 +585,21 @@ const checkCreditScorePublic = async (req, res) => {
     });
 
     await creditReport.save();
+    console.log("Credit report saved to database with ID:", creditReport._id);
 
     // Sync with Google Sheets for public reports
     try {
+      console.log("Attempting to sync with Google Sheets...");
       await googleSheetsService.initialize();
       await googleSheetsService.syncPublicCreditScoreData();
+      console.log("Google Sheets sync completed");
     } catch (syncError) {
       console.error('Failed to sync public credit score data with Google Sheets:', syncError);
     }
 
     // If we have a report URL, download and save the PDF locally (for public reports too)
     if (reportUrl) {
+      console.log("Downloading PDF report from URL:", reportUrl);
       try {
         // Create reports directory if it doesn't exist
         const reportsDir = path.join(__dirname, "../reports");
@@ -589,30 +633,42 @@ const checkCreditScorePublic = async (req, res) => {
         // Update the credit report with the local path
         creditReport.localPath = `/reports/${filename}`;
         await creditReport.save();
+        console.log("PDF downloaded and saved locally:", localPath);
       } catch (downloadError) {
         console.error("Error downloading PDF:", downloadError);
         // We don't fail the entire request if PDF download fails
       }
+    } else {
+      console.log("No report URL found, skipping PDF download");
     }
 
+    console.log("Attempting to send emails to user and admin...");
     // Send email to user and admin
     try {
       // Send email to user
+      console.log("Sending email to user:", { email, name });
       await sendCreditReportEmail(
         { email: email, name: name }, // Use the email from request
         creditReport
       );
+      console.log("User email sent successfully");
       
       // Send email to admin
+      const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+      console.log("Sending email to admin:", adminEmail);
       await sendCreditReportEmail(
-        { email: process.env.ADMIN_EMAIL || process.env.EMAIL_USER, name: "Admin" },
+        { email: adminEmail, name: "Admin" },
         creditReport
       );
+      console.log("Admin email sent successfully");
     } catch (emailError) {
       console.error("Error sending email:", emailError);
+      console.error("Email error stack:", emailError.stack);
       // Don't fail the request if email sending fails
     }
 
+    console.log("=== Completed checkCreditScorePublic successfully ===");
+    
     res.json({
       message: `Credit report retrieved successfully from ${bureau.toUpperCase()}`,
       creditReport: {
@@ -630,6 +686,7 @@ const checkCreditScorePublic = async (req, res) => {
     });
   } catch (error) {
     console.error("Credit check error:", error);
+    console.error("Full error stack:", error.stack);
     res.status(500).json({ 
       message: "Server error", 
       error: error.message,

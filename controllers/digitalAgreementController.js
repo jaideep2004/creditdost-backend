@@ -236,11 +236,186 @@ const generatePdfWithUserData = async (templatePath, userData) => {
   }
 };
 
+// Generate a public URL for the PDF file
+const generatePdfPublicUrl = (pdfPath) => {
+  try {
+    // Extract filename from the full path
+    const fileName = path.basename(pdfPath);
+    
+    // Debug environment variables
+    console.log('Environment variables:');
+    console.log('- TUNNEL_URL:', process.env.TUNNEL_URL);
+    console.log('- BACKEND_URL:', process.env.BACKEND_URL);  
+    console.log('- NODE_ENV:', process.env.NODE_ENV);
+    
+    // Check if we're using a tunnel service like ngrok
+    const tunnelUrl = process.env.TUNNEL_URL;
+    
+    if (tunnelUrl && tunnelUrl !== 'undefined') {
+      // Use the tunnel URL for public access
+      const publicUrl = `${tunnelUrl}/backend-uploads/agreements/${fileName}`;
+      console.log(`✅ Using tunnel URL: ${publicUrl}`);
+      return publicUrl;
+    } else {
+      console.log('⚠️  TUNNEL_URL not found or invalid, falling back to BACKEND_URL');
+    }
+    
+    // For production, you should use a proper CDN or cloud storage
+    // Generate the public URL - assuming the backend serves static files from /backend-uploads
+    // The PDFs are stored in Backend/uploads/agreements/
+    const publicUrl = `${process.env.BACKEND_URL || 'http://localhost:5000'}/backend-uploads/agreements/${fileName}`;
+    
+    // Warn if using localhost in production-like environment
+    if (publicUrl.includes('localhost') && process.env.NODE_ENV === 'production') {
+      console.warn('WARNING: Using localhost URL in production environment for PDF upload');
+    }
+    
+    console.log(`📤 Generated URL: ${publicUrl}`);
+    return publicUrl;
+  } catch (error) {
+    console.error("Error generating PDF public URL:", error);
+    throw error;
+  }
+};
+
+// Upload PDF to SurePass via link with specific client_id
+const uploadPdfToSurepassWithClientId = async (apiKey, pdfLink, clientId) => {
+  try {
+    console.log(`Attempting to upload PDF with client_id ${clientId} from URL: ${pdfLink}`);
+    
+    const baseUrl = "https://kyc-api.surepass.app";
+    
+    const response = await axios.post(
+      `${baseUrl}/api/v1/esign/upload-pdf`,
+      {
+        client_id: clientId, // Use the client_id from initialization
+        link: pdfLink
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    
+    console.log(`SurePass upload response:`, response.data);
+    
+    if (response.data.success && response.data.data.uploaded) {
+      return response.data;
+    } else {
+      throw new Error(`PDF upload failed: ${response.data.message || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error("SurePass PDF upload error:", error.message);
+    console.error("PDF Link attempted:", pdfLink);
+    console.error("Client ID used:", clientId);
+    
+    // Handle specific error cases
+    if (error.response) {
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
+      
+      // Handle 403 Forbidden - account permission issue
+      if (error.response.status === 403) {
+        throw new Error("SurePass API key lacks permission for PDF upload.");
+      }
+      
+      // Handle 400 Bad Request
+      if (error.response.status === 400) {
+        const errorMessage = error.response.data.message || 'Bad request';
+        
+        // Handle specific SurePass messages
+        if (errorMessage.includes('Not allowed, user will upload')) {
+          // This is a configuration limitation, not an error
+          throw new Error("PDF upload via API not permitted for this SurePass account. User must upload manually.");
+        }
+        
+        if (pdfLink.includes('localhost')) {
+          throw new Error("Localhost URLs are not accessible to SurePass. Use a public URL or tunnel service like ngrok.");
+        }
+        
+        throw new Error(`Invalid PDF URL or inaccessible file: ${errorMessage}`);
+      }
+    }
+    
+    throw error;
+  }
+};
+
+// Upload PDF to SurePass via link (legacy function for backward compatibility)
+const uploadPdfToSurepass = async (apiKey, pdfLink) => {
+  try {
+    console.log(`Attempting to upload PDF from URL: ${pdfLink}`);
+    
+    const baseUrl = "https://kyc-api.surepass.app";
+    
+    // First, let's try without a specific client_id to see if SurePass assigns one
+    // Based on the error, it seems like we need to let SurePass handle client initialization
+    const requestBody = {
+      link: pdfLink
+    };
+    
+    // Add client_id only if it's specifically required
+    // Some SurePass setups require a predefined client_id
+    // We'll try without first, then with a generic one if needed
+    
+    const response = await axios.post(
+      `${baseUrl}/api/v1/esign/upload-pdf`,
+      requestBody,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    
+    console.log(`SurePass upload response:`, response.data);
+    
+    if (response.data.success && response.data.data.uploaded) {
+      return response.data;
+    } else {
+      throw new Error(`PDF upload failed: ${response.data.message || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error("SurePass PDF upload error:", error.message);
+    console.error("PDF Link attempted:", pdfLink);
+    
+    // Handle specific error cases
+    if (error.response) {
+      console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
+      
+      // Handle 403 Forbidden - account permission issue
+      if (error.response.status === 403) {
+        throw new Error("SurePass API key lacks permission for PDF upload. Falling back to manual process.");
+      }
+      
+      // Handle 400 Bad Request - usually invalid URL
+      if (error.response.status === 400) {
+        if (pdfLink.includes('localhost')) {
+          throw new Error("Localhost URLs are not accessible to SurePass. Use a public URL or tunnel service like ngrok.");
+        }
+        throw new Error(`Invalid PDF URL or inaccessible file: ${error.response.data.message || 'Bad request'}`);
+      }
+      
+      // Handle 404 Client not found
+      if (error.response.status === 404) {
+        console.log("Client not found - this might be expected behavior. Proceeding with manual fallback.");
+        throw new Error("Client initialization required. Falling back to manual upload process.");
+      }
+    }
+    
+    throw error;
+  }
+};
+
 // Initiate Surepass eSign process
 const initiateEsign = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { documentUrl, signerName, signerEmail, signerPhone } = req.body;
+    const { signerName, signerEmail, signerPhone } = req.body;
 
     // Get Surepass API key
     const apiKey = await getSurepassApiKeyValue();
@@ -251,19 +426,29 @@ const initiateEsign = async (req, res) => {
         .json({ message: "Surepass API key not configured" });
     }
 
-    // Use the correct Surepass eSign API endpoint
-    const baseUrl = "https://kyc-api.surepass.app";
-
-    // Find the digital agreement for this user to update transaction ID
+    // Find the digital agreement for this user
     const digitalAgreement = await DigitalAgreement.findOne({
       userId: req.user.id,
     });
 
-    // Call Surepass eSign API to initiate signing with correct request structure
-    const response = await axios.post(
+    if (!digitalAgreement) {
+      return res.status(404).json({ message: "Digital agreement not found" });
+    }
+
+    if (!digitalAgreement.generatedPdfPath) {
+      return res.status(400).json({ message: "Generated PDF not found" });
+    }
+
+    // Step 1: Initialize eSign session first to get client_id
+    const baseUrl = "https://kyc-api.surepass.app";
+    
+    console.log("Initializing eSign session...");
+    
+    // Initialize without PDF first to get client_id
+    const initResponse = await axios.post(
       `${baseUrl}/api/v1/esign/initialize`,
       {
-        pdf_pre_uploaded: false,
+        pdf_pre_uploaded: false, // Start without pre-uploaded PDF
         sign_type: "suresign",
         config: {
           auth_mode: "1",
@@ -297,20 +482,44 @@ const initiateEsign = async (req, res) => {
       }
     );
 
-    // Extract client_id from the response as per SurePass documentation
-    const client_id = response.data.data.client_id;
-
-    // Update the digital agreement with the client_id and set status to submitted
-    if (digitalAgreement) {
-      digitalAgreement.transactionId = client_id; // Store client_id as transactionId in DB
-      digitalAgreement.status = "submitted"; // Mark as submitted for signing
-      await digitalAgreement.save();
+    // Extract client_id from initialization response
+    const client_id = initResponse.data.data.client_id;
+    console.log(`Got client_id: ${client_id}`);
+    
+    // Step 2: Try to upload PDF using the obtained client_id
+    let pdfPreUploaded = true;
+    let uploadSuccess = true;
+    
+    try {
+      // Generate public URL for the PDF
+      const pdfPublicUrl = generatePdfPublicUrl(digitalAgreement.generatedPdfPath);
+      
+      // Upload the PDF to SurePass with the client_id
+      const uploadResponse = await uploadPdfToSurepassWithClientId(apiKey, pdfPublicUrl, client_id);
+      pdfPreUploaded = true;
+      uploadSuccess = true;
+      console.log("PDF uploaded to SurePass successfully with client_id");
+    } catch (uploadError) {
+      console.log("PDF upload to SurePass not permitted for this account. User will upload manually in SurePass interface.");
+      console.log("Error details:", uploadError.message);
+      // This is expected behavior for some SurePass accounts
+      // Continue with manual process - user will upload PDF in SurePass interface
+      pdfPreUploaded = false;
+      uploadSuccess = false;
     }
+    
+    // Step 3: Update the digital agreement with the client_id and set status to submitted
+    digitalAgreement.transactionId = client_id; // Store client_id as transactionId in DB
+    digitalAgreement.status = "submitted"; // Mark as submitted for signing
+    await digitalAgreement.save();
 
     res.json({
-      message: "eSign process initiated successfully",
-      redirectUrl: response.data.data.url, // Fixed: Use 'url' instead of 'redirect_url'
-      transactionId: client_id, // Using client_id as per SurePass API documentation
+      message: uploadSuccess 
+        ? "eSign process initiated successfully with automatic PDF upload" 
+        : "eSign process initiated successfully. Please upload your agreement when prompted in the SurePass interface.",
+      redirectUrl: initResponse.data.data.url,
+      transactionId: client_id,
+      pdfUploadSuccess: uploadSuccess
     });
   } catch (error) {
     console.error("Surepass eSign initiation error:", error.message);

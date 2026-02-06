@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const session = require("express-session");
 const dotenv = require("dotenv");
 const path = require("path");
 const { initializeReferralSettings } = require("./utils/referralUtils");
@@ -134,9 +135,9 @@ const corsOptions = {
     const allowedOrigins = [
       process.env.FRONTEND_URL || "http://localhost:5173",
       "https://creditdost.onrender.com",
-      "https://reactbackend.creditdostlearning.com",
+      "http://localhost:5000",
       "https://creditdost.co.in",
-      "https://reactbackend.creditdostlearning.com"
+      "http://localhost:5000"
       
     ];
     
@@ -153,6 +154,17 @@ const corsOptions = {
 };
  
 app.use(cors(corsOptions));
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'fallback_session_secret_for_credit_dost',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // Set to true in production with HTTPS
+    maxAge: 1000 * 60 * 10 // 10 minutes
+  }
+}));
 
 // Routes
 // Root route to indicate server is running
@@ -185,6 +197,7 @@ app.use("/api/forms", require("./routes/forms"));
 app.use("/api/digital-agreements", require("./routes/digitalAgreements"));
 app.use("/api/careers", require("./routes/careers"));
 app.use("/api/ai-analysis", require("./routes/aiAnalysis"));
+app.use("/api/sms", require("./routes/sms"));
 console.log('Registering analytics route...');
 app.use("/api/analytics", require("./routes/analytics"));
 console.log('Analytics route registered');
