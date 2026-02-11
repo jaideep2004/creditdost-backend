@@ -285,7 +285,12 @@ const uploadPdfToSurepassWithClientId = async (apiKey, pdfLink, clientId) => {
     
     const baseUrl = "https://kyc-api.surepass.app";
     
-    const response = await axios.post(
+    // Import the Surepass API client
+    const surepassClient = require('../utils/surepassApiClient');
+    
+    // Use rate-limited client for PDF upload
+    const response = await surepassClient.makeRequest(
+      apiKey,
       `${baseUrl}/api/v1/esign/upload-pdf`,
       {
         client_id: clientId, // Use the client_id from initialization
@@ -293,7 +298,6 @@ const uploadPdfToSurepassWithClientId = async (apiKey, pdfLink, clientId) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
       }
@@ -350,6 +354,9 @@ const uploadPdfToSurepass = async (apiKey, pdfLink) => {
     
     const baseUrl = "https://kyc-api.surepass.app";
     
+    // Import the Surepass API client
+    const surepassClient = require('../utils/surepassApiClient');
+    
     // First, let's try without a specific client_id to see if SurePass assigns one
     // Based on the error, it seems like we need to let SurePass handle client initialization
     const requestBody = {
@@ -360,12 +367,12 @@ const uploadPdfToSurepass = async (apiKey, pdfLink) => {
     // Some SurePass setups require a predefined client_id
     // We'll try without first, then with a generic one if needed
     
-    const response = await axios.post(
+    const response = await surepassClient.makeRequest(
+      apiKey,
       `${baseUrl}/api/v1/esign/upload-pdf`,
       requestBody,
       {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
       }
@@ -444,8 +451,12 @@ const initiateEsign = async (req, res) => {
     
     console.log("Initializing eSign session...");
     
-    // Initialize without PDF first to get client_id
-    const initResponse = await axios.post(
+    // Import the Surepass API client
+    const surepassClient = require('../utils/surepassApiClient');
+    
+    // Initialize without PDF first to get client_id using rate-limited client
+    const initResponse = await surepassClient.makeRequest(
+      apiKey,
       `${baseUrl}/api/v1/esign/initialize`,
       {
         pdf_pre_uploaded: false, // Start without pre-uploaded PDF
@@ -476,7 +487,6 @@ const initiateEsign = async (req, res) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
       }
@@ -569,6 +579,7 @@ const eSignWebhook = async (req, res) => {
     // Update agreement status based on eSign status
     if (status === "completed") {
       // Download and save the signed document
+      // Using axios directly here since this is a download operation, not a Surepass API call
       const response = await axios({
         method: "GET",
         url: signed_document_url,

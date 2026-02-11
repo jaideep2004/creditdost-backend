@@ -333,7 +333,7 @@ const initializeDigiLocker = async (req, res) => {
     console.log('Retrieved API key:', apiKey ? 'API key found' : 'API key not found');
     if (apiKey) {
       console.log('API key length:', apiKey.length);
-      console.log('API key starts with:', apiKey.substring(0, 10));
+      // console.log('API key starts with:', apiKey.substring(0, 10));
     }
     
     if (!apiKey) {
@@ -349,8 +349,12 @@ const initializeDigiLocker = async (req, res) => {
     console.log('Using baseUrl:', baseUrl);
     console.log('Making request to:', `${baseUrl}/api/v1/digilocker/initialize`);
 
-    // Call Surepass API to initialize DigiLocker
-    const response = await axios.post(
+    // Import the Surepass API client
+    const surepassClient = require('../utils/surepassApiClient');
+    
+    // Call Surepass API to initialize DigiLocker using rate-limited client
+    const response = await surepassClient.makeRequest(
+      apiKey,
       `${baseUrl}/api/v1/digilocker/initialize`,
       {
         data: {
@@ -360,7 +364,6 @@ const initializeDigiLocker = async (req, res) => {
       },
       {
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         }
       }

@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const { sendCreditReportEmail } = require("../utils/emailService");
 const googleSheetsService = require("../utils/googleSheetsService");
+const surepassClient = require("../utils/surepassApiClient");
 
 // Validation schema for credit check
 const creditCheckSchema = Joi.object({
@@ -236,16 +237,10 @@ const checkCreditScore = async (req, res) => {
       id_type: req.body.id_type || null,
     });
 
-    // Make request to Surepass API with timeout and better error handling
+    // Make request to Surepass API with rate limiting and retry logic
     let response;
     try {
-      response = await axios.post(bureauConfig.endpoint, requestData, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000, // 30 second timeout
-      });
+      response = await surepassClient.makeCreditCheckRequest(apiKey, bureauConfig.endpoint, requestData);
     } catch (apiError) {
       console.error("Surepass API error:", apiError.message);
 
@@ -264,6 +259,15 @@ const checkCreditScore = async (req, res) => {
           message:
             "Network error when connecting to credit bureau. Please check your internet connection and try again.",
           error: "NETWORK_ERROR",
+        });
+      }
+
+      // Handle rate limiting specifically (HTTP 429)
+      if (apiError.response?.status === 429) {
+        console.error("Surepass API rate limit exceeded:", apiError.response.data);
+        return res.status(429).json({
+          message: "Too many requests to credit bureau. Please try again later.",
+          error: "RATE_LIMIT_EXCEEDED",
         });
       }
 
@@ -473,7 +477,7 @@ const checkCreditScorePublic = async (req, res) => {
     });
     console.log("Formatted request data:", JSON.stringify(requestData, null, 2));
 
-    // Make request to Surepass API with timeout and better error handling
+    // Make request to Surepass API with rate limiting and retry logic
     let response;
     try {
       console.log("Making request to Surepass API endpoint:", bureauConfig.endpoint);
@@ -482,13 +486,7 @@ const checkCreditScorePublic = async (req, res) => {
         "Authorization": apiKey ? "[HIDDEN]" : "MISSING"
       });
       
-      response = await axios.post(bureauConfig.endpoint, requestData, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000, // 30 second timeout
-      });
+      response = await surepassClient.makeCreditCheckRequest(apiKey, bureauConfig.endpoint, requestData);
       
       console.log("Surepass API response received:", {
         status: response.status,
@@ -520,6 +518,15 @@ const checkCreditScorePublic = async (req, res) => {
           message:
             "Network error when connecting to credit bureau. Please check your internet connection and try again.",
           error: "NETWORK_ERROR",
+        });
+      }
+
+      // Handle rate limiting specifically (HTTP 429)
+      if (apiError.response?.status === 429) {
+        console.error("Surepass API rate limit exceeded:", apiError.response.data);
+        return res.status(429).json({
+          message: "Too many requests to credit bureau. Please try again later.",
+          error: "RATE_LIMIT_EXCEEDED",
         });
       }
 
