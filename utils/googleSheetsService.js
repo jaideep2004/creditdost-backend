@@ -314,7 +314,7 @@ class GoogleSheetsService {
 
       // Format data for Google Sheets
       const rows = [
-        ['Customer Name', 'Customer Email', 'Customer Phone', 'WhatsApp Number', 'PAN Number', 'Aadhar Number', 'City', 'State', 'Pincode', 'Occupation', 'Monthly Income', 'Credit Score', 'Loan Amount', 'Loan Purpose', 'Message', 'Date'], // Header row
+        ['Customer Name', 'Customer Email', 'Customer Phone', 'WhatsApp Number', 'PAN Number', 'Aadhar Number', 'Full Address', 'City', 'State', 'Pincode', 'Occupation', 'Monthly Income', 'Credit Score', 'Loan Amount', 'Loan Purpose', 'Message', 'Date'], // Header row
         ...businessForms.map(form => [
           form.customerName,
           form.customerEmail,
@@ -322,6 +322,7 @@ class GoogleSheetsService {
           form.whatsappNumber || '',
           form.panNumber || '',
           form.aadharNumber || '',
+          form.fullAddress || '',
           form.city || '',
           form.state || '',
           form.pincode || '',
@@ -338,7 +339,7 @@ class GoogleSheetsService {
       // Update Google Sheet
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: settings.spreadsheetId,
-        range: `Apply for Loan!A1:P${rows.length}`,
+        range: `Apply for Loan!A1:Q${rows.length}`,
         valueInputOption: 'RAW',
         resource: {
           values: rows
@@ -388,7 +389,7 @@ class GoogleSheetsService {
 
       // Format data for Google Sheets with franchise information (excluding WhatsApp Number and City columns)
       const rows = [
-        ['Franchise Name', 'Customer Name', 'Customer Email', 'Customer Phone', 'PAN Number', 'Aadhar Number', 'State', 'Pincode', 'Occupation', 'Monthly Income', 'Date'], // Header row
+        ['Franchise Name', 'Customer Name', 'Customer Email', 'Customer Phone', 'PAN Number', 'Aadhar Number', 'Full Address', 'State', 'Pincode', 'Occupation', 'Monthly Income', 'Date'], // Header row
         ...businessForms.map(form => [
           form.franchiseId?.businessName || 'N/A',
           form.customerName,
@@ -396,6 +397,7 @@ class GoogleSheetsService {
           form.customerPhone,
           form.panNumber || '',
           form.aadharNumber || '',
+          form.fullAddress || '',
           form.state || '',
           form.pincode || '',
           form.occupation || '',
@@ -407,7 +409,7 @@ class GoogleSheetsService {
       // Update Google Sheet
       await this.sheets.spreadsheets.values.update({
         spreadsheetId: settings.spreadsheetId,
-        range: `Business Login!A1:L${rows.length}`,
+        range: `Business Login!A1:M${rows.length}`,
         valueInputOption: 'RAW',
         resource: {
           values: rows

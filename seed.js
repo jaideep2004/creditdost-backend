@@ -114,7 +114,7 @@ const seed = async () => {
     
     const adminUser = new User({
       name: 'Admin User',
-      email: 'admin@gmail.com',
+      email: 'nitinv@creditdost.co.in',
       phone: '9876543210',
       password: adminPassword,
       role: 'admin',
