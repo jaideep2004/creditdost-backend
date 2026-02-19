@@ -371,7 +371,7 @@ const sendCreditReportEmail = async (recipient, creditReport) => {
 
   // Use local path if available for permanent download link
   const downloadLink = creditReport.localPath 
-    ? `${process.env.BACKEND_URL || 'https://reactbackend.creditdostlearning.com'}${creditReport.localPath}`
+    ? `${process.env.BACKEND_URL || 'https://reactbackend.creditdost.co.in'}${creditReport.localPath}`
     : creditReport.reportUrl;
 
   const mailOptions = {

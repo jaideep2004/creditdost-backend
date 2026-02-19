@@ -263,7 +263,7 @@ const generatePdfPublicUrl = (pdfPath) => {
     // For production, you should use a proper CDN or cloud storage
     // Generate the public URL - assuming the backend serves static files from /backend-uploads
     // The PDFs are stored in Backend/uploads/agreements/
-    const publicUrl = `${process.env.BACKEND_URL || 'https://reactbackend.creditdostlearning.com'}/backend-uploads/agreements/${fileName}`;
+    const publicUrl = `${process.env.BACKEND_URL || 'https://reactbackend.creditdost.co.in'}/backend-uploads/agreements/${fileName}`;
     
     // Warn if using localhost in production-like environment
     if (publicUrl.includes('localhost') && process.env.NODE_ENV === 'production') {
