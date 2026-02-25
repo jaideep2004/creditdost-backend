@@ -256,6 +256,12 @@ const sendLeadAssignmentEmail = async (franchiseUser, lead, adminUser) => {
 
 // Send lead approval email to admin
 const sendLeadApprovalEmail = async (adminUser, lead, franchiseUser) => {
+  // Skip sending email if admin user has nitinv@creditdost.co.in email
+  if (adminUser.email === 'nitinv@creditdost.co.in') {
+    console.log('Skipping lead approval email for admin user with nitinv@creditdost.co.in');
+    return;
+  }
+  
   const mailOptions = {
     from: '"Credit Dost Support" <support@creditdost.co.in> ',
     to: adminUser.email,
@@ -280,6 +286,12 @@ const sendLeadApprovalEmail = async (adminUser, lead, franchiseUser) => {
 
 // Send lead rejection email to admin
 const sendLeadRejectionEmail = async (adminUser, lead, franchiseUser, reason) => {
+  // Skip sending email if admin user has nitinv@creditdost.co.in email
+  if (adminUser.email === 'nitinv@creditdost.co.in') {
+    console.log('Skipping lead rejection email for admin user with nitinv@creditdost.co.in');
+    return;
+  }
+  
   const mailOptions = {
     from: '"Credit Dost Support" <support@creditdost.co.in> ',
     to: adminUser.email,
