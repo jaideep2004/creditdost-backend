@@ -17,7 +17,7 @@ const generateSlug = (title) => {
 // @access  Public
 exports.getAllBlogs = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, search, category } = req.query;
+    const { page = 1, limit = 10, status, search, category, tag } = req.query;
     
     // Build filter
     const filter = { status: 'published' }; // Default to published blogs for public API
@@ -28,6 +28,11 @@ exports.getAllBlogs = async (req, res) => {
     // Add category filter
     if (category) {
       filter.categories = { $in: [category] };
+    }
+    
+    // Add tag filter
+    if (tag) {
+      filter.tags = { $in: [tag] };
     }
     
     // Add search functionality
@@ -201,7 +206,7 @@ exports.deleteBlog = async (req, res) => {
 // @access  Private/Admin
 exports.getAdminBlogs = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, search, category } = req.query;
+    const { page = 1, limit = 10, status, search, category, tag } = req.query;
     
     // Build filter
     const filter = {};
@@ -212,6 +217,11 @@ exports.getAdminBlogs = async (req, res) => {
     // Add category filter
     if (category) {
       filter.categories = { $in: [category] };
+    }
+    
+    // Add tag filter
+    if (tag) {
+      filter.tags = { $in: [tag] };
     }
     
     // Add search functionality

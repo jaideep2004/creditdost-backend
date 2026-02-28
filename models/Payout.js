@@ -44,6 +44,15 @@ const payoutSchema = new mongoose.Schema({
     type: Number,
     default: 2, // 2% TDS
   },
+  gstAmount: {
+    type: Number,
+    required: false,
+  },
+  gstPercentage: {
+    type: Number,
+    default: 18, // 18% GST
+    required: false,
+  },
   status: {
     type: String,
     enum: ['pending', 'processing', 'completed', 'failed'],
