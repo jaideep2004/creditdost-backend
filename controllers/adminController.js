@@ -1037,11 +1037,13 @@ const calculateFranchisePayouts = async (req, res) => {
     // Calculate TDS (2% of total amount)
     const tdsAmount = totalAmount * 0.02;
     
-    // Calculate GST (18% of total amount)
-    const gstAmount = totalAmount * 0.18;
+    // IMPORTANT: GST is NOT deducted from franchise payouts
+    // Franchisees pay GST separately on their own services
+    // Only TDS is deducted at source
+    const gstAmount = 0; // No GST deduction
     
-    // Calculate final payout amount after TDS and GST deduction
-    const finalPayoutAmount = totalAmount - tdsAmount - gstAmount;
+    // Calculate final payout amount after TDS deduction only
+    const finalPayoutAmount = totalAmount - tdsAmount;
     
     // Create payout record
     const payout = new Payout({
@@ -1054,9 +1056,9 @@ const calculateFranchisePayouts = async (req, res) => {
       totalAmount: finalPayoutAmount,
       grossAmount: totalAmount,
       tdsAmount: tdsAmount,
-      gstAmount: gstAmount,
+      gstAmount: gstAmount, // Set to 0 (no GST deduction)
       tdsPercentage: 2,
-      gstPercentage: 18,
+      gstPercentage: 0, // No GST deduction
       status: 'pending'
     });
     
@@ -1069,7 +1071,7 @@ const calculateFranchisePayouts = async (req, res) => {
       message: 'Payout calculated successfully',
       payout,
       tdsDeducted: tdsAmount,
-      gstDeducted: gstAmount,
+      gstDeducted: 0, // No GST deducted
       grossAmount: totalAmount,
       netAmount: finalPayoutAmount
     });

@@ -8,6 +8,7 @@ const customerPackageSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
   description: Joi.string().required(),
   price: Joi.number().min(0).required(),
+  gstPercentage: Joi.number().min(0).max(100).optional(),
   creditsIncluded: Joi.number().min(0).required(),
   features: Joi.array().items(Joi.string()),
   isActive: Joi.boolean(),

@@ -15,6 +15,12 @@ const packageSchema = new mongoose.Schema({
     required: true,
     min: 0,
   },
+  gstPercentage: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100,
+  },
   creditsIncluded: {
     type: Number,
     required: true,
@@ -48,6 +54,7 @@ const packageSchema = new mongoose.Schema({
     default: 0,
     min: 0,
   },
+  // Note: Payouts are calculated on base price (price field), not including GST
 }, {
   timestamps: true,
 });

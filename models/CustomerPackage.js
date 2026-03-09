@@ -14,7 +14,13 @@ const customerPackageSchema = new mongoose.Schema({
     type: Number,
     required: true,    
     min: 0,
-  },                        
+  },
+  gstPercentage: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100,
+  },
   creditsIncluded: {
     type: Number,
     required: true,
@@ -48,6 +54,7 @@ const customerPackageSchema = new mongoose.Schema({
     default: 0,
     min: 0,
   },
+  // Note: Payouts are calculated on base price (price field), not including GST
   // Franchise packages that can access this customer package
   availableForPackages: [{
     type: mongoose.Schema.Types.ObjectId,
