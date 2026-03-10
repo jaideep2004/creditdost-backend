@@ -134,8 +134,12 @@ const submitBusinessForm = async (req, res) => {
     }
     
     // Create Razorpay order
-    const options = {
-      amount: customerPackage.price * 100, // amount in paise
+  const basePrice = customerPackage.price;
+  const gstAmount = (customerPackage.price * (customerPackage.gstPercentage || 0)) / 100;
+  const totalPriceWithGST = basePrice + gstAmount;
+    
+  const options = {
+      amount: totalPriceWithGST * 100, // amount in paise
       currency: 'INR',
       receipt: `receipt_${businessForm._id}`,
       payment_capture: 1,
