@@ -2,6 +2,7 @@ const AIAnalysis = require('../models/AIAnalysis');
 const Franchise = require('../models/Franchise');
 const { upload } = require('../utils/fileUpload');
 const { sendAIAnalysisNotificationToAdmin, sendAIAnalysisResponseToFranchise } = require('../utils/emailService');
+const { processDocument } = require('../utils/claudeService');
 const path = require('path');
 const fs = require('fs');
 
@@ -52,17 +53,69 @@ const uploadDocument = async (req, res) => {
 
       await aiAnalysisDoc.save();
 
-      // Read file buffer and send email notification to admin
-      try {
-        // Read the file buffer
-        const fileBuffer = fs.readFileSync(req.file.path);
-        await sendAIAnalysisNotificationToAdmin(franchise, req.file.originalname, fileBuffer);
-      } catch (emailError) {
-        console.error('Failed to send admin notification email:', emailError);
-      }
+      // Send admin notification email (non-blocking)
+      (async () => {
+        try {
+          const fileBuffer = fs.readFileSync(req.file.path);
+          await sendAIAnalysisNotificationToAdmin(franchise, req.file.originalname, fileBuffer);
+        } catch (emailError) {
+          console.error('Failed to send admin notification email:', emailError);
+        }
+      })();
+
+      // Trigger automatic Claude AI analysis
+      // Run asynchronously to not block the response
+      (async () => {
+        try {
+          // Update status to processing
+          aiAnalysisDoc.claudeAnalysisStatus = 'processing';
+          await aiAnalysisDoc.save();
+
+          // Process document with Claude
+          const analysisResult = await processDocument(
+            req.file.path,
+            req.file.originalname,
+            null // Use default prompt from env
+          );
+
+          // Generate HTML file name
+          const htmlFileName = `analysis_${path.basename(req.file.originalname, path.extname(req.file.originalname))}_${Date.now()}.html`;
+          const htmlFilePath = path.join(path.dirname(req.file.path), htmlFileName);
+
+          // Save HTML analysis to file
+          fs.writeFileSync(htmlFilePath, analysisResult.content, 'utf-8');
+
+          // Update document with analysis
+          aiAnalysisDoc.claudeAnalysisHtml = htmlFilePath;
+          aiAnalysisDoc.claudeAnalysisFileName = htmlFileName;
+          aiAnalysisDoc.analysisPrompt = process.env.AI_ANALYSIS_PROMPT;
+          aiAnalysisDoc.isAutoAnalyzed = true;
+          aiAnalysisDoc.claudeAnalysisStatus = 'completed';
+          aiAnalysisDoc.analyzedAt = new Date();
+          await aiAnalysisDoc.save();
+
+          // Send email with analysis report to franchise user
+          try {
+            const htmlBuffer = fs.readFileSync(htmlFilePath);
+            await sendAIAnalysisResponseToFranchise(
+              { email: aiAnalysisDoc.franchiseEmail, businessName: aiAnalysisDoc.franchiseName },
+              htmlFileName,
+              htmlBuffer
+            );
+          } catch (emailError) {
+            console.error('Failed to send analysis report email:', emailError);
+          }
+        } catch (analysisError) {
+          console.error('Claude analysis failed:', analysisError.message);
+          // Update status to failed but don't delete the document
+          aiAnalysisDoc.claudeAnalysisStatus = 'failed';
+          aiAnalysisDoc.claudeAnalysisError = analysisError.message;
+          await aiAnalysisDoc.save();
+        }
+      })();
 
       res.status(201).json({
-        message: 'Document uploaded successfully',
+        message: 'Document uploaded successfully. AI analysis will be performed automatically.',
         document: aiAnalysisDoc
       });
     });
@@ -182,10 +235,111 @@ const getFranchiseDocuments = async (req, res) => {
   }
 };
 
+// Manually trigger Claude AI analysis on a document
+const analyzeWithClaude = async (req, res) => {
+  try {
+    const document = await AIAnalysis.findById(req.params.id)
+      .populate('franchise', 'businessName email userId');
+
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    // Check if already analyzed
+    if (document.claudeAnalysisStatus === 'completed' && document.claudeAnalysisHtml) {
+      return res.status(400).json({ 
+        message: 'Document has already been analyzed. Delete and re-upload to analyze again.' 
+      });
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(document.uploadedDocument)) {
+      return res.status(404).json({ message: 'Uploaded document file not found' });
+    }
+
+    // Update status to processing
+    document.claudeAnalysisStatus = 'processing';
+    document.analysisPrompt = req.body.prompt || process.env.AI_ANALYSIS_PROMPT;
+    await document.save();
+
+    // Run analysis asynchronously
+    (async () => {
+      try {
+        // Process document with Claude
+        const analysisResult = await processDocument(
+          document.uploadedDocument,
+          document.uploadedDocumentName,
+          req.body.prompt || null
+        );
+
+        // Generate HTML file name
+        const htmlFileName = `analysis_${path.basename(document.uploadedDocumentName, path.extname(document.uploadedDocumentName))}_${Date.now()}.html`;
+        const htmlFilePath = path.join(path.dirname(document.uploadedDocument), htmlFileName);
+
+        // Save HTML analysis to file
+        fs.writeFileSync(htmlFilePath, analysisResult.content, 'utf-8');
+
+        // Update document with analysis
+        document.claudeAnalysisHtml = htmlFilePath;
+        document.claudeAnalysisFileName = htmlFileName;
+        document.isAutoAnalyzed = false; // Manual analysis
+        document.claudeAnalysisStatus = 'completed';
+        document.analyzedAt = new Date();
+        await document.save();
+
+        // Send email with analysis report to franchise user
+        try {
+          const htmlBuffer = fs.readFileSync(htmlFilePath);
+          await sendAIAnalysisResponseToFranchise(
+            { email: document.franchiseEmail, businessName: document.franchiseName },
+            htmlFileName,
+            htmlBuffer
+          );
+        } catch (emailError) {
+          console.error('Failed to send analysis report email:', emailError);
+        }
+      } catch (analysisError) {
+        console.error('Claude analysis failed:', analysisError.message);
+        document.claudeAnalysisStatus = 'failed';
+        document.claudeAnalysisError = analysisError.message;
+        await document.save();
+      }
+    })();
+
+    res.json({
+      message: 'AI analysis initiated. You will receive the report via email once completed.',
+      documentId: document._id
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Download Claude analysis HTML file
+const downloadClaudeAnalysis = async (req, res) => {
+  try {
+    const document = await AIAnalysis.findById(req.params.id);
+
+    if (!document || !document.claudeAnalysisHtml) {
+      return res.status(404).json({ message: 'Analysis not found' });
+    }
+
+    if (!fs.existsSync(document.claudeAnalysisHtml)) {
+      return res.status(404).json({ message: 'Analysis file not found' });
+    }
+
+    res.sendFile(path.resolve(document.claudeAnalysisHtml));
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   uploadDocument,
   getAllDocuments,
   getDocumentById,
   respondToDocument,
-  getFranchiseDocuments
+  getFranchiseDocuments,
+  analyzeWithClaude,
+  downloadClaudeAnalysis
 };

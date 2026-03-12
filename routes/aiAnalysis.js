@@ -4,8 +4,14 @@ const {
   getAllDocuments,
   getDocumentById,
   respondToDocument,
-  getFranchiseDocuments
+  getFranchiseDocuments,
+  analyzeWithClaude,
+  downloadClaudeAnalysis
 } = require('../controllers/aiAnalysisController');
+const { 
+  getAIAnalysisSettings, 
+  updateAIAnalysisPrompt 
+} = require('../controllers/aiAnalysisSettingsController');
 const auth = require('../middleware/auth');
 const rbac = require('../middleware/rbac');
 
@@ -35,5 +41,25 @@ router.get('/admin/documents/:id', auth, rbac('admin'), getDocumentById);
 // @desc    Respond to document with updated PDF (admin only)
 // @access  Private/Admin
 router.post('/admin/respond/:id', auth, rbac('admin'), respondToDocument);
+
+// @route   POST /api/ai-analysis/franchise/analyze/:id
+// @desc    Manually trigger AI analysis on uploaded document
+// @access  Private/Franchise User
+router.post('/franchise/analyze/:id', auth, rbac('franchise_user'), analyzeWithClaude);
+
+// @route   GET /api/ai-analysis/franchise/download-analysis/:id
+// @desc    Download Claude AI analysis HTML report
+// @access  Private/Franchise User
+router.get('/franchise/download-analysis/:id', auth, rbac('franchise_user'), downloadClaudeAnalysis);
+
+// @route   GET /api/ai-analysis/admin/settings
+// @desc    Get AI analysis settings (prompt, model)
+// @access  Private/Admin
+router.get('/admin/settings', auth, rbac('admin'), getAIAnalysisSettings);
+
+// @route   PUT /api/ai-analysis/admin/settings
+// @desc    Update AI analysis settings
+// @access  Private/Admin
+router.put('/admin/settings', auth, rbac('admin'), updateAIAnalysisPrompt);
 
 module.exports = router;
