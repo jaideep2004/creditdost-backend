@@ -146,10 +146,11 @@ const analyzeWithClaude = async (documentData, prompt, documentType = 'pdf') => 
 
     console.log('Sending request to Claude API...');
 
-    // Call Claude API with increased max_tokens for longer responses
-    const response = await anthropic.messages.create({
+    // Call Claude API with streaming for long-running requests
+    // Streaming is required for operations that may take longer than 10 minutes
+    const stream = await anthropic.messages.stream({
       model: model,
-      max_tokens: 8192, // Increased from 4096 to allow longer, more detailed reports
+      max_tokens: 25000, // Increased to 25k tokens for comprehensive analysis reports
       messages: [
         {
           role: 'user',
@@ -158,11 +159,24 @@ const analyzeWithClaude = async (documentData, prompt, documentType = 'pdf') => 
       ]
     });
 
-    console.log('Received response from Claude API');
-    console.log('Response tokens - Input:', response.usage.input_tokens, ', Output:', response.usage.output_tokens, ', Total:', (response.usage.input_tokens + response.usage.output_tokens));
+    console.log('Received response stream from Claude API');
 
-    // Extract the analysis from response
-    const analysisContent = response.content[0].text;
+    // Wait for the final message (this collects all chunks automatically)
+    const finalMessage = await stream.finalMessage();
+    
+    console.log('Stream completed');
+    console.log('Response tokens - Input:', finalMessage.usage.input_tokens, ', Output:', finalMessage.usage.output_tokens, ', Total:', (finalMessage.usage.input_tokens + finalMessage.usage.output_tokens));
+
+    // Extract the analysis from the final message
+    let analysisContent = '';
+    
+    if (finalMessage.content && finalMessage.content.length > 0) {
+      analysisContent = finalMessage.content[0].text || '';
+    }
+    
+    if (!analysisContent) {
+      throw new Error('No content received from Claude API');
+    }
 
     // Clean up the response - remove markdown code blocks if present
     let cleanedAnalysis = analysisContent;

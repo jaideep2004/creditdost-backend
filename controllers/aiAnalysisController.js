@@ -102,8 +102,15 @@ const uploadDocument = async (req, res) => {
               htmlFileName,
               htmlBuffer
             );
+            // Update status to email_sent after successful email delivery
+            aiAnalysisDoc.claudeAnalysisStatus = 'email_sent';
+            aiAnalysisDoc.emailSentAt = new Date();
+            await aiAnalysisDoc.save();
           } catch (emailError) {
             console.error('Failed to send analysis report email:', emailError);
+            // Keep status as 'completed' but log the error
+            aiAnalysisDoc.claudeAnalysisError = 'Analysis completed but email failed to send';
+            await aiAnalysisDoc.save();
           }
         } catch (analysisError) {
           console.error('Claude analysis failed:', analysisError.message);

@@ -66,7 +66,7 @@ const aiAnalysisSchema = new mongoose.Schema({
   },
   claudeAnalysisStatus: {
     type: String,
-    enum: ['pending', 'processing', 'completed', 'failed'],
+    enum: ['pending', 'processing', 'completed', 'email_sent', 'failed'],
     default: 'pending'
   },
   claudeAnalysisError: {

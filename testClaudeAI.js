@@ -7,7 +7,7 @@
  * 1. Environment variable configuration
  * 2. Document file reading
  * 3. Claude API connection
- * 4. Document analysis
+ * 4. Document analysis 
  */
 
 require('dotenv').config();
