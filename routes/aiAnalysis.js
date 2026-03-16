@@ -52,6 +52,11 @@ router.post('/franchise/analyze/:id', auth, rbac('franchise_user'), analyzeWithC
 // @access  Private/Franchise User
 router.get('/franchise/download-analysis/:id', auth, rbac('franchise_user'), downloadClaudeAnalysis);
 
+// @route   GET /api/ai-analysis/admin/download-analysis/:id
+// @desc    Download Claude AI analysis HTML report (Admin)
+// @access  Private/Admin
+router.get('/admin/download-analysis/:id', auth, rbac('admin'), downloadClaudeAnalysis);
+
 // @route   GET /api/ai-analysis/admin/settings
 // @desc    Get AI analysis settings (prompt, model)
 // @access  Private/Admin
