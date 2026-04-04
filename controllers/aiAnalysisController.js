@@ -10,7 +10,7 @@ const fs = require('fs');
 const pdfUpload = upload.single('document');
 
 // Upload PDF document by franchise user
-const uploadDocument = async (req, res) => {
+const uploadDocument = async (req, res) => { 
   try {
     // Handle file upload
     pdfUpload(req, res, async (err) => {
@@ -116,7 +116,22 @@ const uploadDocument = async (req, res) => {
           console.error('Claude analysis failed:', analysisError.message);
           // Update status to failed but don't delete the document
           aiAnalysisDoc.claudeAnalysisStatus = 'failed';
-          aiAnalysisDoc.claudeAnalysisError = analysisError.message;
+                
+          // Sanitize error message - hide sensitive API details from users
+          let sanitizedError = 'Analysis failed. Please contact admin.';
+                
+          // Check if it's a Claude API error with credit balance issue
+          if (analysisError.message && analysisError.message.includes('credit balance is too low')) {
+            sanitizedError = 'Analysis failed. Please contact admin.';
+          } else if (analysisError.message && analysisError.message.includes('400')) {
+            // For other 400 errors, also show generic message
+            sanitizedError = 'Analysis failed. Please contact admin.';
+          } else {
+            // For other errors, still use generic message for security
+            sanitizedError = 'Analysis failed. Please contact admin.';
+          }
+                
+          aiAnalysisDoc.claudeAnalysisError = sanitizedError;
           await aiAnalysisDoc.save();
         }
       })();
@@ -307,8 +322,23 @@ const analyzeWithClaude = async (req, res) => {
         }
       } catch (analysisError) {
         console.error('Claude analysis failed:', analysisError.message);
+        
+        // Sanitize error message - hide sensitive API details from users
+        let sanitizedError = 'Analysis failed. Please contact admin.';
+        
+        // Check if it's a Claude API error with credit balance issue
+        if (analysisError.message && analysisError.message.includes('credit balance is too low')) {
+          sanitizedError = 'Analysis failed. Please contact admin.';
+        } else if (analysisError.message && analysisError.message.includes('400')) {
+          // For other 400 errors, also show generic message
+          sanitizedError = 'Analysis failed. Please contact admin.';
+        } else {
+          // For other errors, still use generic message for security
+          sanitizedError = 'Analysis failed. Please contact admin.';
+        }
+        
         document.claudeAnalysisStatus = 'failed';
-        document.claudeAnalysisError = analysisError.message;
+        document.claudeAnalysisError = sanitizedError;
         await document.save();
       }
     })();

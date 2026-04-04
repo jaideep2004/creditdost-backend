@@ -62,11 +62,11 @@ const getVisitorStats = async (req, res) => {
     } catch (error) {
       console.log('Using fallback for total stats');
       totalStats = {
-        totalUsers: realTimeVisitors * 100, // Estimate based on real-time
-        pageViews: realTimeVisitors * 250,
-        sessions: realTimeVisitors * 90,
-        bounceRate: '45.50',
-        avgSessionDuration: 180
+        totalUsers: 0,
+        pageViews: 0,
+        sessions: 0,
+        bounceRate: 0,
+        avgSessionDuration: 0
       };
     }
     
@@ -81,22 +81,14 @@ const getVisitorStats = async (req, res) => {
       topPages = await googleAnalyticsService.getTopPages(5);
     } catch (error) {
       console.log('Using fallback for top pages');
-      topPages = [
-        { pageTitle: 'Home Page', pagePath: '/', pageViews: Math.max(10, realTimeVisitors * 50), uniqueUsers: Math.max(5, realTimeVisitors * 25) },
-        { pageTitle: 'Contact Us', pagePath: '/contact', pageViews: Math.max(5, realTimeVisitors * 20), uniqueUsers: Math.max(3, realTimeVisitors * 10) },
-        { pageTitle: 'Packages', pagePath: '/packages', pageViews: Math.max(3, realTimeVisitors * 15), uniqueUsers: Math.max(2, realTimeVisitors * 8) }
-      ];
+      topPages = [];
     }
     
     try {
       trafficSources = await googleAnalyticsService.getTrafficSources();
     } catch (error) {
       console.log('Using fallback for traffic sources');
-      trafficSources = [
-        { source: 'Direct', users: Math.max(20, realTimeVisitors * 40), sessions: Math.max(25, realTimeVisitors * 45) },
-        { source: 'Organic Search', users: Math.max(15, realTimeVisitors * 30), sessions: Math.max(20, realTimeVisitors * 35) },
-        { source: 'Social', users: Math.max(5, realTimeVisitors * 10), sessions: Math.max(8, realTimeVisitors * 15) }
-      ];
+      trafficSources = [];
     }
 
     console.log('Successfully fetched visitor stats, sending response');

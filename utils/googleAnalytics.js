@@ -164,8 +164,8 @@ class GoogleAnalyticsService {
         error.code,
         error.status
       );
-      // Return a random number instead of throwing error to prevent entire analytics call from failing
-      return Math.floor(Math.random() * 10);
+      // Return 0 instead of random number to avoid misleading data
+      return 0;
     }
   }
 
@@ -216,13 +216,13 @@ class GoogleAnalyticsService {
       };
     } catch (error) {
       console.error("Error fetching total visitors:", error);
-      // Return sample data instead of throwing error to prevent entire analytics call from failing
+      // Return zeros instead of fake data to avoid misleading admins
       return {
-        totalUsers: Math.floor(Math.random() * 1000) + 500,
-        pageViews: Math.floor(Math.random() * 2000) + 1000,
-        sessions: Math.floor(Math.random() * 900) + 450,
-        bounceRate: (Math.random() * 40 + 30).toFixed(2), // 30-70%
-        avgSessionDuration: Math.floor(Math.random() * 300 + 120), // 2-7 minutes
+        totalUsers: 0,
+        pageViews: 0,
+        sessions: 0,
+        bounceRate: 0,
+        avgSessionDuration: 0,
       };
     }
   }
@@ -267,20 +267,8 @@ class GoogleAnalyticsService {
       return chartData;
     } catch (error) {
       console.error("Error fetching visitors by date:", error);
-      // Return sample data instead of throwing error to prevent entire analytics call from failing
-      const sampleData = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateString = date.toISOString().split("T")[0].replace(/-/g, "");
-        sampleData.push({
-          date: dateString,
-          users: Math.floor(Math.random() * 200) + 100,
-          pageViews: Math.floor(Math.random() * 400) + 200,
-          sessions: Math.floor(Math.random() * 180) + 90,
-        });
-      }
-      return sampleData;
+      // Return empty array instead of fake data
+      return [];
     }
   }
 
@@ -328,39 +316,8 @@ class GoogleAnalyticsService {
     } catch (error) {
       console.error("Error fetching top pages:", error.message);
       console.error("Full error:", error);
-      // Return sample data instead of empty array to show something in UI
-      return [
-        {
-          pageTitle: "Home Page",
-          pagePath: "/",
-          pageViews: Math.floor(Math.random() * 100) + 50,
-          uniqueUsers: Math.floor(Math.random() * 80) + 40,
-        },
-        {
-          pageTitle: "Contact Us",
-          pagePath: "/contact",
-          pageViews: Math.floor(Math.random() * 50) + 20,
-          uniqueUsers: Math.floor(Math.random() * 40) + 15,
-        },
-        {
-          pageTitle: "Packages",
-          pagePath: "/packages",
-          pageViews: Math.floor(Math.random() * 40) + 15,
-          uniqueUsers: Math.floor(Math.random() * 30) + 10,
-        },
-        {
-          pageTitle: "Credit Check",
-          pagePath: "/credit-check",
-          pageViews: Math.floor(Math.random() * 30) + 10,
-          uniqueUsers: Math.floor(Math.random() * 25) + 8,
-        },
-        {
-          pageTitle: "Franchise Opportunity",
-          pagePath: "/franchise-opportunity",
-          pageViews: Math.floor(Math.random() * 25) + 5,
-          uniqueUsers: Math.floor(Math.random() * 20) + 5,
-        },
-      ];
+      // Return empty array instead of fake data
+      return [];
     }
   }
 
@@ -408,34 +365,8 @@ class GoogleAnalyticsService {
     } catch (error) {
       console.error("Error fetching traffic sources:", error.message);
       console.error("Full error:", error);
-      // Return sample data instead of empty array to show something in UI
-      return [
-        {
-          source: "Direct",
-          users: Math.floor(Math.random() * 200) + 100,
-          sessions: Math.floor(Math.random() * 220) + 110,
-        },
-        {
-          source: "Organic Search",
-          users: Math.floor(Math.random() * 150) + 50,
-          sessions: Math.floor(Math.random() * 170) + 60,
-        },
-        {
-          source: "Social",
-          users: Math.floor(Math.random() * 80) + 20,
-          sessions: Math.floor(Math.random() * 90) + 25,
-        },
-        {
-          source: "Referral",
-          users: Math.floor(Math.random() * 60) + 10,
-          sessions: Math.floor(Math.random() * 70) + 15,
-        },
-        {
-          source: "Email",
-          users: Math.floor(Math.random() * 40) + 5,
-          sessions: Math.floor(Math.random() * 45) + 8,
-        },
-      ];
+      // Return empty array instead of fake data
+      return [];
     }
   }
 }
